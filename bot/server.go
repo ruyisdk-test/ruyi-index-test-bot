@@ -19,7 +19,7 @@ func Serve(cfg *Config) {
 
 	schedule, err := CronStart(cfg)
 	if err != nil {
-		slog.Error("cron init failed: ", "error", err.Error())
+		slog.Error("cron init failed:", "error", err.Error())
 		return
 	}
 

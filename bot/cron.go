@@ -1,15 +1,15 @@
 package bot
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/robfig/cron/v3"
 )
 
 type CronConfig struct {
-	Cron   string            `yaml:"cron"`
-	Cmd    string            `yaml:"cmd"`
-	Params map[string]string `yaml:"params"`
+	Cron string `yaml:"cron"`
+	Cmd  Cmd    `yaml:"cmd"`
 
 	entryID cron.EntryID `yaml:"-"`
 }
@@ -17,11 +17,22 @@ type CronConfig struct {
 func CronStart(cfg *Config) (*cron.Cron, error) {
 	c := cron.New()
 
+	// before cron/serve
+	if err := CmdVerify(cfg.BeforeServe, cfg); err != nil {
+		return nil, err
+	}
+	if err := CmdRun(cfg.BeforeServe, cfg); err != nil {
+		slog.Error("before cron/serve command failed:", "error", err.Error())
+		return nil, err
+	}
+
+	// cron
 	for _, conf := range cfg.Cron {
-		if err := CmdVerify(conf.Cmd, conf.Params); err != nil {
+		if err := CmdVerify(conf.Cmd, cfg); err != nil {
 			return nil, err
 		}
-		id, err := c.AddFunc(conf.Cron, func() { CmdRun(conf.Cmd, conf.Params) })
+		slog.Info("cron add command:", "name", conf.Cmd.Name, "params", conf.Cmd.Params)
+		id, err := c.AddFunc(conf.Cron, func() { _ = CmdRun(conf.Cmd, cfg) })
 
 		if err != nil {
 			return nil, err

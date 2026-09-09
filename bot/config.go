@@ -3,6 +3,7 @@ package bot
 import (
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 
 	"go.yaml.in/yaml/v3"
@@ -15,7 +16,12 @@ type Config struct {
 
 	CacheDir string `yaml:"cache.cache_dir"`
 
-	Cron []CronConfig `yaml:"cron"`
+	GitRemote    string `yaml:"git.remote"`
+	GitBranch    string `yaml:"git.branch"`
+	repoCacheDir string `yaml:"-"`
+
+	BeforeServe Cmd          `yaml:"before_serve"`
+	Cron        []CronConfig `yaml:"cron"`
 
 	configPath string     `yaml:"-"`
 	configInit bool       `yaml:"-"`
@@ -64,6 +70,13 @@ func CfgLoad() (*Config, error) {
 	}
 	if config.CacheDir == "" {
 		config.CacheDir = filepath.Join(pathCurrent, "cache")
+	}
+	config.repoCacheDir = path.Join(config.CacheDir, "repo", "ruyisdk")
+	if config.GitRemote == "" {
+		config.GitRemote = "https://github.com/ruyisdk/packages-index.git"
+	}
+	if config.GitBranch == "" {
+		config.GitBranch = "main"
 	}
 
 	slog.Info("listening on address:", "addr", config.ListenAddr)
