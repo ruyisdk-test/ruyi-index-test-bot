@@ -20,7 +20,8 @@ type Config struct {
 	RepoBranch   string `yaml:"repo.branch"`
 	repoCacheDir string `yaml:"-"`
 
-	ValkeyAddr string `yaml:"valkey.addr"`
+	ValkeyAddr    string `yaml:"valkey.addr"`
+	ValkeyDataTtl int64  `yaml:"valkey.data_ttl"`
 
 	BeforeServe Cmd          `yaml:"before_serve"`
 	Cron        []CronConfig `yaml:"cron"`
@@ -83,10 +84,14 @@ func CfgLoad() (*Config, error) {
 	if config.ValkeyAddr == "" {
 		config.ValkeyAddr = "127.0.0.1:6379"
 	}
+	if config.ValkeyDataTtl == 0 {
+		config.ValkeyDataTtl = 7 // days
+	}
 
 	slog.Info("listening on address:", "addr", config.ListenAddr)
 	slog.Info("use cache dir:", "path", config.CacheDir)
 	slog.Info("connect valkey address:", "addr", config.ValkeyAddr)
+	slog.Info("connect valkey data TTL:", "days", config.ValkeyDataTtl)
 
 	if _, err := os.Stat(config.CacheDir); os.IsNotExist(err) {
 		if err := os.Mkdir(config.CacheDir, 0755); err != nil {
