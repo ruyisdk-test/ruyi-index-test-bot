@@ -7,8 +7,9 @@ import (
 )
 
 type CronConfig struct {
-	Cron string `yaml:"cron"`
-	Cmd  string `yaml:"cmd"`
+	Cron   string            `yaml:"cron"`
+	Cmd    string            `yaml:"cmd"`
+	Params map[string]string `yaml:"params"`
 
 	entryID cron.EntryID `yaml:"-"`
 }
@@ -17,10 +18,10 @@ func CronStart(cfg *Config) (*cron.Cron, error) {
 	c := cron.New()
 
 	for _, conf := range cfg.Cron {
-		if err := CmdVerify(conf.Cmd); err != nil {
+		if err := CmdVerify(conf.Cmd, conf.Params); err != nil {
 			return nil, err
 		}
-		id, err := c.AddFunc(conf.Cron, func() { CmdRun(conf.Cmd) })
+		id, err := c.AddFunc(conf.Cron, func() { CmdRun(conf.Cmd, conf.Params) })
 
 		if err != nil {
 			return nil, err
