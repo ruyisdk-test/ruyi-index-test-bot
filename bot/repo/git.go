@@ -9,7 +9,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
-var repoHash string
+var repoHash = ""
 
 func setRepoHash(hash string) {
 	if len(hash) > 7 {

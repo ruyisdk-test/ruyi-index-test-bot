@@ -7,6 +7,7 @@ require (
 	github.com/go-git/go-git/v6 v6.0.0-alpha.5
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/valkey-io/valkey-go v1.0.77
 	go.yaml.in/yaml/v3 v3.0.5
 )
 
@@ -47,6 +48,6 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )

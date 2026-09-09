@@ -60,8 +60,8 @@ func gitVerify(cmd Cmd, cfg *Config) error {
 		return errors.New("git command only support do=pull")
 	}
 
-	if cfg.GitBranch == "" || cfg.GitRemote == "" {
-		return errors.New("invalid remote or branch: " + "remote=" + cfg.GitRemote + "branch=" + cfg.GitBranch)
+	if cfg.RepoBranch == "" || cfg.RepoRemote == "" {
+		return errors.New("invalid remote or branch: " + "remote=" + cfg.RepoRemote + "branch=" + cfg.RepoBranch)
 	}
 
 	return nil
@@ -81,7 +81,12 @@ func emptyRun(_ Cmd, _ *Config) error {
 }
 
 func gitRun(cmd Cmd, cfg *Config) error {
-	return repo.CheckLatest(cfg.repoCacheDir, cfg.GitRemote, cfg.GitBranch)
+	err := repo.CheckLatest(cfg.repoCacheDir, cfg.RepoRemote, cfg.RepoBranch)
+	if err != nil {
+		return err
+	}
+
+	return repo.LoadData(cfg.repoCacheDir)
 }
 
 func testRun(cmd Cmd, cfg *Config) error {

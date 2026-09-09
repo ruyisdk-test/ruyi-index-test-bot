@@ -16,9 +16,11 @@ type Config struct {
 
 	CacheDir string `yaml:"cache.cache_dir"`
 
-	GitRemote    string `yaml:"git.remote"`
-	GitBranch    string `yaml:"git.branch"`
+	RepoRemote   string `yaml:"repo.remote"`
+	RepoBranch   string `yaml:"repo.branch"`
 	repoCacheDir string `yaml:"-"`
+
+	ValkeyAddr string `yaml:"valkey.addr"`
 
 	BeforeServe Cmd          `yaml:"before_serve"`
 	Cron        []CronConfig `yaml:"cron"`
@@ -72,15 +74,19 @@ func CfgLoad() (*Config, error) {
 		config.CacheDir = filepath.Join(pathCurrent, "cache")
 	}
 	config.repoCacheDir = path.Join(config.CacheDir, "repo", "ruyisdk")
-	if config.GitRemote == "" {
-		config.GitRemote = "https://github.com/ruyisdk/packages-index.git"
+	if config.RepoRemote == "" {
+		config.RepoRemote = "https://github.com/ruyisdk/packages-index.git"
 	}
-	if config.GitBranch == "" {
-		config.GitBranch = "main"
+	if config.RepoBranch == "" {
+		config.RepoBranch = "main"
+	}
+	if config.ValkeyAddr == "" {
+		config.ValkeyAddr = "127.0.0.1:6379"
 	}
 
 	slog.Info("listening on address:", "addr", config.ListenAddr)
 	slog.Info("use cache dir:", "path", config.CacheDir)
+	slog.Info("connect valkey address:", "addr", config.ValkeyAddr)
 
 	if _, err := os.Stat(config.CacheDir); os.IsNotExist(err) {
 		if err := os.Mkdir(config.CacheDir, 0755); err != nil {

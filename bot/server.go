@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/db"
 )
 
 func Serve(cfg *Config) {
@@ -15,6 +16,12 @@ func Serve(cfg *Config) {
 	server := http.Server{
 		Addr:    cfg.ListenAddr,
 		Handler: router,
+	}
+
+	err := db.Connect(cfg.ValkeyAddr)
+	if err != nil {
+		slog.Error("Valkey connect err:", "error", err.Error())
+		return
 	}
 
 	schedule, err := CronStart(cfg)
@@ -31,6 +38,7 @@ func Serve(cfg *Config) {
 
 		go func() {
 			CronStop(schedule)
+			db.Close()
 			err := server.Shutdown(context.Background())
 			if err != nil {
 				slog.Error("sent gin shutdown", "error", err.Error())

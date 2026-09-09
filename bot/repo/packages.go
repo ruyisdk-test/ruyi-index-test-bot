@@ -76,7 +76,9 @@ type VersionChecksum struct {
 	Sha512 string `toml:"sha512"`
 }
 
-func ConfigLoad(repoPath string) (*Config, error) {
+var repoConfig *Config = nil
+
+func configLoad(repoPath string) (*Config, error) {
 	configPath := filepath.Join(repoPath, "config.toml")
 
 	data, err := os.ReadFile(configPath)
@@ -92,7 +94,9 @@ func ConfigLoad(repoPath string) (*Config, error) {
 	return &config, nil
 }
 
-func PackagesLoad(repoPath string) ([]PackageGroups, error) {
+var repoPackages []PackageGroups = nil
+
+func packagesLoad(repoPath string) ([]PackageGroups, error) {
 	packagesPath := filepath.Join(repoPath, "packages")
 	if _, err := os.Stat(packagesPath); os.IsNotExist(err) {
 		packagesPath = filepath.Join(repoPath, "manifests")
@@ -141,4 +145,20 @@ func PackagesLoad(repoPath string) ([]PackageGroups, error) {
 	}
 
 	return groups, nil
+}
+
+func LoadData(repoPath string) error {
+	config, err := configLoad(repoPath)
+	if err != nil {
+		return err
+	}
+	repoConfig = config
+
+	packages, err := packagesLoad(repoPath)
+	if err != nil {
+		return err
+	}
+	repoPackages = packages
+
+	return nil
 }

@@ -3,16 +3,13 @@ package repo
 import "log/slog"
 
 func TestRun(repoPath string) error {
-	cfg, err := ConfigLoad(repoPath)
-	if err != nil {
-		return err
-	}
-	pkgs, err := PackagesLoad(repoPath)
+	err := LoadData(repoPath)
+
 	if err != nil {
 		return err
 	}
 
-	slog.Info("load repo", "cfg", cfg, "pkgs", pkgs)
+	slog.Info("load repo")
 
 	return nil
 }
