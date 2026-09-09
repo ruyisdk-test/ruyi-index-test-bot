@@ -9,17 +9,31 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
+var repoHash string
+
+func getRepoHash() string {
+	return repoHash
+}
+
 func repoInit(path string, remote string, branch string) error {
 	repo, err := git.PlainClone(path, &git.CloneOptions{
 		URL:           remote,
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
 		SingleBranch:  true,
 	})
-	if repo != nil {
-		_ = repo.Close()
-	}
 
-	return err
+	if err != nil {
+		return err
+	}
+	defer repo.Close()
+
+	hash, err := repo.Head()
+	if err != nil {
+		return err
+	}
+	repoHash = hash.Hash().String()
+
+	return nil
 }
 
 func CheckLatest(repoPath string, remote string, branch string) error {
@@ -56,6 +70,12 @@ func CheckLatest(repoPath string, remote string, branch string) error {
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return err
 	}
+
+	hash, err := repo.Head()
+	if err != nil {
+		return err
+	}
+	repoHash = hash.Hash().String()
 
 	return nil
 }
