@@ -2,8 +2,11 @@ package repo
 
 import (
 	"errors"
+	"log/slog"
+	url2 "net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -76,8 +79,6 @@ type VersionChecksum struct {
 	Sha512 string `toml:"sha512"`
 }
 
-var repoConfig *Config = nil
-
 func configLoad(repoPath string) (*Config, error) {
 	configPath := filepath.Join(repoPath, "config.toml")
 
@@ -94,9 +95,21 @@ func configLoad(repoPath string) (*Config, error) {
 	return &config, nil
 }
 
+var repoConfig *Config = nil
 var repoPackages []PackageGroups = nil
 
 func packagesLoad(repoPath string) ([]PackageGroups, error) {
+	config, err := configLoad(repoPath)
+	if err != nil {
+		return nil, err
+	}
+	repoConfig = config
+
+	repoMirrors := make(map[string][]string)
+	for _, mirror := range repoConfig.Mirrors {
+		repoMirrors[mirror.Id] = mirror.Urls
+	}
+
 	packagesPath := filepath.Join(repoPath, "packages")
 	if _, err := os.Stat(packagesPath); os.IsNotExist(err) {
 		packagesPath = filepath.Join(repoPath, "manifests")
@@ -140,6 +153,15 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 				if err = toml.Unmarshal(data, &groups[i].Packages[j].Versions[k]); err != nil {
 					return nil, err
 				}
+
+				for _, distfile := range groups[i].Packages[j].Versions[k].Distfiles {
+					rm := slices.Contains(distfile.Restrict, "mirror")
+					newUrls, err := applyConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
+					if err != nil {
+						return nil, err
+					}
+					distfile.Urls = newUrls
+				}
 			}
 		}
 	}
@@ -147,12 +169,58 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 	return groups, nil
 }
 
-func LoadData(repoPath string) error {
-	config, err := configLoad(repoPath)
-	if err != nil {
-		return err
+func applyConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
+	if repoConfig == nil {
+		return nil, errors.New("load repo config first")
 	}
-	repoConfig = config
+
+	var newUrls []string
+	if !restrictMirror {
+		for _, mirror := range mirrors["ruyi-dist"] {
+			url, err := url2.JoinPath(mirror, name)
+			if err != nil {
+				return nil, err
+			}
+
+			slog.Debug("apply ruyi-dist url:", "url", url)
+			newUrls = append(newUrls, url)
+		}
+	}
+
+	for _, url := range origUrls {
+		purl, err := url2.Parse(url)
+		if err != nil {
+			return nil, err
+		}
+
+		scheme := purl.Scheme
+		host := purl.Host
+		path := purl.Path
+
+		if scheme == "mirror" {
+			rhost := mirrors[host]
+			if rhost == nil || len(rhost) == 0 {
+				return nil, errors.New("mirror not found in repo config: " + "mirror=" + host)
+			}
+
+			for _, rh := range rhost {
+				ru, err := url2.JoinPath(rh, path)
+				if err != nil {
+					return nil, err
+				}
+				slog.Debug("apply mirror url:", "mirror", host, "url", ru)
+				newUrls = append(newUrls, ru)
+			}
+		} else {
+			slog.Debug("apply origin url:", "url", url)
+			newUrls = append(newUrls, url)
+		}
+	}
+
+	return newUrls, nil
+}
+
+func LoadData(repoPath string) error {
 
 	packages, err := packagesLoad(repoPath)
 	if err != nil {
