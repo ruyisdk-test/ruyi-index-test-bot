@@ -11,6 +11,12 @@ import (
 
 var repoHash string
 
+func setRepoHash(hash string) {
+	if len(hash) > 7 {
+		repoHash = hash[:7]
+	}
+}
+
 func getRepoHash() string {
 	return repoHash
 }
@@ -31,7 +37,7 @@ func repoInit(path string, remote string, branch string) error {
 	if err != nil {
 		return err
 	}
-	repoHash = hash.Hash().String()
+	setRepoHash(hash.Hash().String())
 
 	return nil
 }
@@ -75,7 +81,7 @@ func CheckLatest(repoPath string, remote string, branch string) error {
 	if err != nil {
 		return err
 	}
-	repoHash = hash.Hash().String()
+	setRepoHash(hash.Hash().String())
 
 	return nil
 }
