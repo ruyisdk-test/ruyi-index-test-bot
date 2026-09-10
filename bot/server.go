@@ -91,6 +91,7 @@ func newDbRouter(router *gin.Engine) {
 	router.GET("/packages/packages/:type", pkgSearchPkgsByGroup)
 	router.GET("/packages/versions/:type/:pkg", pkgListPackageVersions)
 	router.GET("/packages/versions/:type/:pkg/:version", pkgSearchPackageVersion)
+	router.GET("/packages/url", pkgSearchPkgsByUrl)
 }
 
 func return500(c *gin.Context, err error) {
@@ -156,6 +157,16 @@ func pkgSearchGroupsByPkg(c *gin.Context) {
 
 func pkgSearchPkgsByGroup(c *gin.Context) {
 	r, err := db.GetPackagesByGroup(c.Request.Context(), c.Param("type"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgSearchPkgsByUrl(c *gin.Context) {
+	r, err := db.GetPackagesByUrl(c.Request.Context(), c.Query("url"))
 	if err != nil {
 		return500(c, err)
 		return
