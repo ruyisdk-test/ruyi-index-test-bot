@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -51,6 +52,7 @@ func TestRun(repoPath string, ttlDays int64) error {
 
 	testList := db.GetUrlTestList()
 	for _, url := range testList {
+		slog.Debug("run test for:", "url", url)
 		code, err := testUrl(url)
 		err = db.AddUrlTestStatus(ctx, ttlDays, url, code, err)
 		if err != nil {

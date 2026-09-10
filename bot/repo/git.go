@@ -20,6 +20,7 @@ func setRepoHash(hash string) {
 func getRepoHash() string {
 	if repoHash == "" {
 		slog.Warn("get empty local repo hash")
+		return "test-dirty"
 	}
 	return repoHash
 }

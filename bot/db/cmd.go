@@ -548,10 +548,14 @@ func AddUrlTestStatus(ctx context.Context, ttlDay int64, url string, status int,
 	urlStatusAdd := valkeyClient.B().Sadd().Key(urlStatusKey).Member(string(stats)).Build()
 	urlStatusExp := valkeyClient.B().Expire().Key(urlStatusKey).Seconds(ttl).Build()
 
+	cmds := []valkey.Completed{urlStatusAdd, urlStatusExp}
 	urlFailureKey := viewUrlFailure
-	urlFailureAdd := valkeyClient.B().Sadd().Key(urlFailureKey).Member(url).Build()
+	if stat.Code != 200 {
+		urlFailureAdd := valkeyClient.B().Sadd().Key(urlFailureKey).Member(url).Build()
+		cmds = append(cmds, urlFailureAdd)
+	}
 
-	result := valkeyClient.DoMulti(ctx, urlStatusAdd, urlStatusExp, urlFailureAdd)
+	result := valkeyClient.DoMulti(ctx, cmds...)
 	for _, r := range result {
 		if err := r.Error(); err != nil {
 			return err
