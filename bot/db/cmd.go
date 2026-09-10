@@ -39,6 +39,7 @@ const viewUrlTestStatus = viewPrefix + "%s\x00status"
 const viewUrlFailure = viewPrefix + "urlfailed"
 
 var packagesGroups []string = nil
+var urlTestList []string = nil
 
 // AddViews list groups
 // list packages\00groups
@@ -204,7 +205,9 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	)
 
 	// url -> packages
+	newUrlTestList := make([]string, 0, len(urlPkgs))
 	for u, pkgs := range urlPkgs {
+		newUrlTestList = append(newUrlTestList, u)
 		urlKey := fmt.Sprintf(viewUrlPackages, hash, u)
 		cmds = append(
 			cmds,
@@ -251,6 +254,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	}
 
 	packagesGroups = newPackagesGroups
+	urlTestList = newUrlTestList
 	return nil
 }
 
@@ -609,6 +613,10 @@ func CleanUrlFailures(ctx context.Context) error {
 		Build()
 
 	return valkeyClient.Do(ctx, sdel).Error()
+}
+
+func GetUrlTestList() []string {
+	return urlTestList
 }
 
 func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
