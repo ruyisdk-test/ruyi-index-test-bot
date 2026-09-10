@@ -588,7 +588,7 @@ func CleanUrlFailures(ctx context.Context) error {
 
 	delUrl := make([]string, 0)
 	for _, url := range urlFailures["urls"] {
-		status, err := GetUrlStatus(ctx, url)
+		status, err := GetUrlTestStatus(ctx, url)
 		if err != nil {
 			delUrl = append(delUrl, url)
 		}
@@ -611,7 +611,7 @@ func CleanUrlFailures(ctx context.Context) error {
 	return valkeyClient.Do(ctx, sdel).Error()
 }
 
-func GetUrlStatus(ctx context.Context, url string) (map[string]any, error) {
+func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
 
 	urlKey := fmt.Sprintf(viewUrlTestStatus, url)
 

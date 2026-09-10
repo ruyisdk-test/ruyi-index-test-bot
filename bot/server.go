@@ -92,6 +92,8 @@ func newDbRouter(router *gin.Engine) {
 	router.GET("/packages/versions/:type/:pkg", pkgListPackageVersions)
 	router.GET("/packages/versions/:type/:pkg/:version", pkgSearchPackageVersion)
 	router.GET("/packages/url", pkgSearchPkgsByUrl)
+	router.GET("/packages/test/failure", testUrlFailure)
+	router.GET("/packages/test/status", testUrlStatus)
 }
 
 func return500(c *gin.Context, err error) {
@@ -187,6 +189,26 @@ func pkgListPackageVersions(c *gin.Context) {
 
 func pkgSearchPackageVersion(c *gin.Context) {
 	r, err := db.GetPackageVersionData(c.Request.Context(), c.Param("pkg"), c.Param("type"), c.Param("version"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func testUrlFailure(c *gin.Context) {
+	r, err := db.ListUrlFailures(c.Request.Context())
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func testUrlStatus(c *gin.Context) {
+	r, err := db.GetUrlTestStatus(c.Request.Context(), c.Query("url"))
 	if err != nil {
 		return500(c, err)
 		return
