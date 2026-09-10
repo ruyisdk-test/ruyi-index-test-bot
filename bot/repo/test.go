@@ -2,8 +2,8 @@ package repo
 
 import "log/slog"
 
-func TestRun(repoPath string) error {
-	err := LoadData(repoPath)
+func TestRun(repoPath string, ttlDays int64) error {
+	err := LoadData(repoPath, ttlDays)
 
 	if err != nil {
 		return err

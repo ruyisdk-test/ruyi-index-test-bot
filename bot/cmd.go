@@ -86,9 +86,9 @@ func gitRun(cmd Cmd, cfg *Config) error {
 		return err
 	}
 
-	return repo.LoadData(cfg.repoCacheDir)
+	return repo.LoadData(cfg.repoCacheDir, cfg.ValkeyDataTtl)
 }
 
 func testRun(cmd Cmd, cfg *Config) error {
-	return repo.TestRun(cfg.repoCacheDir)
+	return repo.TestRun(cfg.repoCacheDir, cfg.ValkeyDataTtl)
 }
