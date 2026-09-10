@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sahilm/fuzzy"
 	"github.com/valkey-io/valkey-go"
@@ -15,6 +17,12 @@ import (
 
 type VersionData struct {
 	Distfiles map[string][]string `json:"distfiles"`
+}
+
+type TestStatus struct {
+	Code int        `json:"code"`
+	Msg  string     `json:"message"`
+	Prev *time.Time `json:"prev"`
 }
 
 const viewPrefix = "ruyindex\x00"
@@ -25,6 +33,10 @@ const valuePackages = "%s\x00%s"
 const viewPackagesGroup = viewPrefix + "%s\x00%s\x00groups"
 const viewGroupsPackages = viewPrefix + "%s\x00%s\x00packages"
 const viewVersions = viewPrefix + "%s\x00%s\x00%s\x00versions"
+const viewUrlPackages = viewPrefix + "%s\x00%s\x00packages"
+
+const viewUrlTestStatus = viewPrefix + "%s\x00status"
+const viewUrlFailure = viewPrefix + "urlfailed"
 
 var packagesGroups []string = nil
 
@@ -46,6 +58,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 
 	groups := make([]string, 0, len(data))
 	newPackagesGroups := make([]string, 0)
+	urlPkgs := make(map[string][]string)
 
 	cmds := make([]valkey.Completed, 0)
 
@@ -60,7 +73,8 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 		for pkg, versions := range packages {
 
 			pkgList = append(pkgList, pkg)
-			newPackagesGroups = append(newPackagesGroups, fmt.Sprintf(valuePackages, pkg, group))
+			valuePkg := fmt.Sprintf(valuePackages, pkg, group)
+			newPackagesGroups = append(newPackagesGroups, valuePkg)
 
 			// package -> groups
 			packageGroupKey := fmt.Sprintf(viewPackagesGroup, hash, pkg)
@@ -109,6 +123,15 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 					Seconds(ttl).
 					Build(),
 			)
+
+			// url -> packages
+			for _, value := range versions {
+				for _, urls := range value.Distfiles {
+					for _, url := range urls {
+						urlPkgs[url] = append(urlPkgs[url], valuePkg)
+					}
+				}
+			}
 		}
 
 		// group -> packages
@@ -180,6 +203,28 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 			Build(),
 	)
 
+	// url -> packages
+	for u, pkgs := range urlPkgs {
+		urlKey := fmt.Sprintf(viewUrlPackages, hash, u)
+		cmds = append(
+			cmds,
+			valkeyClient.B().
+				Sadd().
+				Key(urlKey).
+				Member(pkgs...).
+				Build(),
+		)
+
+		cmds = append(
+			cmds,
+			valkeyClient.B().
+				Expire().
+				Key(urlKey).
+				Seconds(ttl).
+				Build(),
+		)
+	}
+
 	// do all
 	results := valkeyClient.DoMulti(
 		ctx,
@@ -241,6 +286,7 @@ func ListGroups(ctx context.Context) (map[string]any, error) {
 
 	vv := make(map[string]any)
 	vv["groups"] = v
+	vv["hash"] = hash
 
 	return vv, nil
 }
@@ -286,6 +332,7 @@ func ListPackages(ctx context.Context, page int, size int) (map[string]any, erro
 	}
 	vv["packages"] = p
 	vv["pages"] = pageM
+	vv["hash"] = hash
 
 	return vv, nil
 }
@@ -336,6 +383,7 @@ func GetGroupsByPkg(ctx context.Context, pkg string) (map[string]any, error) {
 	vv := make(map[string]any)
 	vv["groups"] = v
 	vv["package"] = pkg
+	vv["hash"] = hash
 
 	return vv, nil
 }
@@ -364,6 +412,7 @@ func GetPackagesByGroup(ctx context.Context, group string) (map[string]any, erro
 	vv := make(map[string]any)
 	vv["group"] = group
 	vv["packages"] = v
+	vv["hash"] = hash
 
 	return vv, nil
 }
@@ -401,6 +450,7 @@ func GetPackageVersionData(ctx context.Context, pkg string, group string, versio
 	vv["versions"] = vd.Distfiles
 	vv["group"] = group
 	vv["package"] = pkg
+	vv["hash"] = hash
 
 	return vv, nil
 }
@@ -430,6 +480,156 @@ func GetPackageVersions(ctx context.Context, pkg string, group string) (map[stri
 	vv["versions"] = values
 	vv["group"] = group
 	vv["package"] = pkg
+	vv["hash"] = hash
+
+	return vv, nil
+}
+
+func GetPackagesByUrl(ctx context.Context, url string) (map[string]any, error) {
+	hash, err := getCurrentHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	urlKey := fmt.Sprintf(viewUrlPackages, hash, url)
+
+	pkgs, err := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().
+			Smembers().
+			Key(urlKey).
+			Build(),
+	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		k := strings.Split(pkg, "\x00")
+		p = append(p, map[string]string{
+			"package": k[0],
+			"group":   k[1],
+		})
+	}
+	vv["packages"] = p
+	vv["hash"] = hash
+
+	return vv, nil
+}
+
+func AddUrlTestStatus(ctx context.Context, ttlDay int64, url string, status int, err error) error {
+	msg := "pass"
+	if err != nil {
+		msg = fmt.Sprintf("fail: %s", err.Error())
+	}
+
+	prev := time.Now()
+	stat := TestStatus{
+		Msg:  msg,
+		Code: status,
+		Prev: &prev,
+	}
+
+	stats, err := json.Marshal(&stat)
+	if err != nil {
+		return err
+	}
+
+	ttl := ttlDay * 24 * 60 * 60
+
+	urlStatusKey := fmt.Sprintf(viewUrlTestStatus, url)
+	urlStatusAdd := valkeyClient.B().Sadd().Key(urlStatusKey).Member(string(stats)).Build()
+	urlStatusExp := valkeyClient.B().Expire().Key(urlStatusKey).Seconds(ttl).Build()
+
+	urlFailureKey := viewUrlFailure
+	urlFailureAdd := valkeyClient.B().Sadd().Key(urlFailureKey).Member(url).Build()
+
+	result := valkeyClient.DoMulti(ctx, urlStatusAdd, urlStatusExp, urlFailureAdd)
+	for _, r := range result {
+		if err := r.Error(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ListUrlFailures(ctx context.Context) (map[string][]string, error) {
+	urlFailureKey := viewUrlFailure
+
+	urls, err := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().
+			Smembers().
+			Key(urlFailureKey).
+			Build(),
+	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string][]string)
+	vv["urls"] = urls
+
+	return vv, nil
+}
+
+func CleanUrlFailures(ctx context.Context) error {
+	urlFailureKey := viewUrlFailure
+
+	urlFailures, err := ListUrlFailures(ctx)
+	if err != nil {
+		return err
+	}
+
+	delUrl := make([]string, 0)
+	for _, url := range urlFailures["urls"] {
+		status, err := GetUrlStatus(ctx, url)
+		if err != nil {
+			delUrl = append(delUrl, url)
+		}
+		stat := status["status"]
+		if reflect.TypeOf(stat).Kind() == reflect.Slice && len(stat.([]string)) == 0 {
+			delUrl = append(delUrl, url)
+		}
+	}
+
+	if len(delUrl) == 0 {
+		return nil
+	}
+
+	sdel := valkeyClient.B().
+		Srem().
+		Key(urlFailureKey).
+		Member(delUrl...).
+		Build()
+
+	return valkeyClient.Do(ctx, sdel).Error()
+}
+
+func GetUrlStatus(ctx context.Context, url string) (map[string]any, error) {
+
+	urlKey := fmt.Sprintf(viewUrlTestStatus, url)
+
+	status, err := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().
+			Smembers().
+			Key(urlKey).
+			Build(),
+	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	vv["status"] = status
+	vv["url"] = url
 
 	return vv, nil
 }
