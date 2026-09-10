@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sahilm/fuzzy"
 	"github.com/valkey-io/valkey-go"
 )
 
@@ -42,9 +43,8 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 		return errors.New("ttl days must be greater than zero")
 	}
 	cHash, err := getCurrentHash(ctx)
-	if err == nil && cHash == hash {
+	if err == nil && cHash == hash && packagesGroups != nil {
 		slog.Info("skip same hash in database", "hash", hash)
-		return nil
 	}
 
 	ttl := ttlDays * 24 * 60 * 60
@@ -291,6 +291,28 @@ func ListPackages(ctx context.Context, page int, size int) (map[string]any, erro
 	}
 	vv["packages"] = p
 	vv["pages"] = pageM
+
+	return vv, nil
+}
+
+// SearchPackages fuzzy search packages
+func SearchPackages(pattern string) (map[string]any, error) {
+	matches := fuzzy.Find(pattern, packagesGroups)
+	if len(matches) > 50 {
+		matches = matches[:50]
+	}
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(matches))
+	for _, match := range matches {
+		k := strings.Split(match.Str, "\x00")
+		p = append(p, map[string]string{
+			"package": k[0],
+			"group":   k[1],
+			"score":   strconv.Itoa(match.Score),
+		})
+	}
+	vv["packages"] = p
 
 	return vv, nil
 }

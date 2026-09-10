@@ -7,6 +7,7 @@ require (
 	github.com/go-git/go-git/v6 v6.0.0-alpha.5
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/sahilm/fuzzy v0.1.3
 	github.com/valkey-io/valkey-go v1.0.77
 	go.yaml.in/yaml/v3 v3.0.5
 )
