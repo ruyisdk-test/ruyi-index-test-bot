@@ -25,7 +25,7 @@ type TestStatus struct {
 	Prev *time.Time `json:"prev"`
 }
 
-const viewPrefix = "ruyindex\x00"
+const viewPrefix = "ruyindextextbot\x00"
 const viewHash = viewPrefix + "hash"
 const viewGroups = viewPrefix + "%s\x00groups"
 const viewPackages = viewPrefix + "%s\x00packages"
