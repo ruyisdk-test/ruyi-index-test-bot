@@ -99,8 +99,9 @@ func configLoad(repoPath string) (*Config, error) {
 
 var repoConfig *Config = nil
 var repoPackages []PackageGroups = nil
+var dbPackagesData map[string]map[string]map[string]db.VersionData = nil
 
-func packagesLoad(repoPath string, dbTtlDays int64) ([]PackageGroups, error) {
+func packagesLoad(repoPath string) ([]PackageGroups, error) {
 	config, err := configLoad(repoPath)
 	if err != nil {
 		return nil, err
@@ -178,10 +179,9 @@ func packagesLoad(repoPath string, dbTtlDays int64) ([]PackageGroups, error) {
 		}
 	}
 
-	// apply to database
-	ctx := context.Background()
+	dbPackagesData = dbData
 
-	return groups, db.AddViews(ctx, getRepoHash(), dbTtlDays, dbData)
+	return groups, nil
 }
 
 func applyConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
@@ -236,12 +236,16 @@ func applyConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors
 }
 
 func LoadData(repoPath string, dbTtlDays int64) error {
-
-	packages, err := packagesLoad(repoPath, dbTtlDays)
-	if err != nil {
-		return err
+	if repoConfig == nil || repoPackages != nil || dbPackagesData == nil {
+		packages, err := packagesLoad(repoPath)
+		if err != nil {
+			return err
+		}
+		repoPackages = packages
 	}
-	repoPackages = packages
 
-	return nil
+	// apply to database
+	// refresh database before data expire
+	ctx := context.Background()
+	return db.AddViews(ctx, getRepoHash(), dbTtlDays, dbPackagesData)
 }

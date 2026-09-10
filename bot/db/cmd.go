@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"strconv"
 	"strings"
@@ -41,10 +40,6 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	}
 	if ttlDays <= 0 {
 		return errors.New("ttl days must be greater than zero")
-	}
-	cHash, err := getCurrentHash(ctx)
-	if err == nil && cHash == hash && packagesGroups != nil {
-		slog.Info("skip same hash in database", "hash", hash)
 	}
 
 	ttl := ttlDays * 24 * 60 * 60
@@ -198,7 +193,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	}
 
 	// update hash after all views are written
-	err = valkeyClient.Do(
+	err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Set().
 			Key(viewHash).
