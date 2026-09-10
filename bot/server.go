@@ -12,6 +12,13 @@ import (
 )
 
 func Serve(cfg *Config) {
+	controlRouter := gin.Default()
+
+	controlServer := http.Server{
+		Addr:    cfg.ControlListenAddr,
+		Handler: controlRouter,
+	}
+
 	router := newRouter()
 
 	server := http.Server{
@@ -32,7 +39,7 @@ func Serve(cfg *Config) {
 	}
 
 	// shutdown endpoint
-	router.GET("/shutdown", func(c *gin.Context) {
+	controlRouter.GET("/shutdown", func(c *gin.Context) {
 		c.JSON(202, gin.H{
 			"status": "shutting down",
 		})
@@ -44,19 +51,30 @@ func Serve(cfg *Config) {
 			if err != nil {
 				slog.Error("sent gin shutdown", "error", err.Error())
 			}
+			err = controlServer.Shutdown(context.Background())
+			if err != nil {
+				slog.Error("sent gin control shutdown", "error", err.Error())
+			}
 		}()
 	})
 
 	// cron
-	router.GET("/cron", func(c *gin.Context) {
+	controlRouter.GET("/cron", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"cron": GetCronEntryInfo(schedule),
 		})
 	})
 
-	err = server.ListenAndServe()
+	go func() {
+		err = server.ListenAndServe()
+		if err != nil {
+			slog.Error("server listen and serve", "error", err.Error())
+		}
+	}()
+
+	err = controlServer.ListenAndServe()
 	if err != nil {
-		slog.Error("gin listen and serve", "error", err.Error())
+		slog.Error("control server listen and serve", "error", err.Error())
 	}
 }
 

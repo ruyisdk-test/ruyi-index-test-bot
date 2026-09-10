@@ -12,7 +12,8 @@ import (
 const filename = "config.yaml"
 
 type Config struct {
-	ListenAddr string `yaml:"server.listen_addr"`
+	ListenAddr        string `yaml:"server.listen_addr"`
+	ControlListenAddr string `yaml:"server.control_addr"`
 
 	CacheDir string `yaml:"cache.cache_dir"`
 
@@ -68,8 +69,11 @@ func CfgLoad() (*Config, error) {
 		config.node = &node
 	}
 
+	if config.ControlListenAddr == "" {
+		config.ControlListenAddr = "127.0.0.1:9876"
+	}
 	if config.ListenAddr == "" {
-		config.ListenAddr = "127.0.0.1:9876"
+		config.ListenAddr = "127.0.0.1:9877"
 	}
 	if config.CacheDir == "" {
 		config.CacheDir = filepath.Join(pathCurrent, "cache")
@@ -88,7 +92,8 @@ func CfgLoad() (*Config, error) {
 		config.ValkeyDataTtl = 7 // days
 	}
 
-	slog.Info("listening on address:", "addr", config.ListenAddr)
+	slog.Info("service listening on address:", "addr", config.ListenAddr)
+	slog.Info("control listening on address:", "addr", config.ControlListenAddr)
 	slog.Info("use cache dir:", "path", config.CacheDir)
 	slog.Info("connect valkey address:", "addr", config.ValkeyAddr)
 	slog.Info("connect valkey data TTL:", "days", config.ValkeyDataTtl)
