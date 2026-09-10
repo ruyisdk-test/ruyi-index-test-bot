@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/db"
@@ -64,6 +65,8 @@ func newRouter() *gin.Engine {
 
 	router.GET("/version", version)
 
+	newDbRouter(router)
+
 	return router
 }
 
@@ -77,4 +80,95 @@ func version(c *gin.Context) {
 			"version": "unknown",
 		})
 	}
+}
+
+func newDbRouter(router *gin.Engine) {
+	router.GET("/packages/types", pkgListGroups)
+	router.GET("/packages/types/:pkg", pkgSearchGroupsByPkg)
+	// ?page=&size=
+	router.GET("/packages/packages", pkgListPackages)
+	router.GET("/packages/packages/:type", pkgSearchPkgsByGroup)
+	router.GET("/packages/versions/:type/:pkg", pkgListPackageVersions)
+	router.GET("/packages/versions/:type/:pkg/:version", pkgSearchPackageVersion)
+}
+
+func return500(c *gin.Context, err error) {
+	slog.Error("list groups err:", "error", err.Error())
+	c.JSON(500, gin.H{
+		"status": "err",
+		"msg":    err.Error(),
+	})
+}
+
+func pkgListGroups(c *gin.Context) {
+	r, err := db.ListGroups(c.Request.Context())
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgListPackages(c *gin.Context) {
+	ps := c.Query("page")
+	// ss := c.Query("size")
+	p, err := strconv.Atoi(ps)
+	if err != nil {
+		p = 0
+	}
+	// s, err := strconv.Atoi(ss)
+	// if err != nil {
+	// 	s = 50
+	// }
+	// fixed page size
+	s := 50
+
+	r, err := db.ListPackages(c.Request.Context(), p, s)
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgSearchGroupsByPkg(c *gin.Context) {
+	r, err := db.GetGroupsByPkg(c.Request.Context(), c.Param("pkg"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgSearchPkgsByGroup(c *gin.Context) {
+	r, err := db.GetPackagesByGroup(c.Request.Context(), c.Param("type"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgListPackageVersions(c *gin.Context) {
+	r, err := db.GetPackageVersions(c.Request.Context(), c.Param("pkg"), c.Param("type"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func pkgSearchPackageVersion(c *gin.Context) {
+	r, err := db.GetPackageVersionData(c.Request.Context(), c.Param("pkg"), c.Param("type"), c.Param("version"))
+	if err != nil {
+		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
 }

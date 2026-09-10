@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/valkey-io/valkey-go"
 )
@@ -17,18 +20,26 @@ type VersionData struct {
 const viewPrefix = "ruyindex\x00"
 const viewHash = viewPrefix + "hash"
 const viewGroups = viewPrefix + "%s\x00groups"
+const viewPackages = viewPrefix + "%s\x00packages"
+const valuePackages = "%s\x00%s"
 const viewPackagesGroup = viewPrefix + "%s\x00%s\x00groups"
-const viewPackages = viewPrefix + "%s\x00%s\x00packages"
+const viewGroupsPackages = viewPrefix + "%s\x00%s\x00packages"
 const viewVersions = viewPrefix + "%s\x00%s\x00%s\x00versions"
+
+var packagesGroups []string = nil
 
 // AddViews list groups
 // list packages\00groups
 // group -> packages
+// package -> groups
 // packages\00groups -> version
 // packages\00groups\00version -> distfiles -> urls
 func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]map[string]map[string]VersionData) error {
 	if valkeyClient == nil {
 		return errors.New("valkey client is nil")
+	}
+	if ttlDays <= 0 {
+		return errors.New("ttl days must be greater than zero")
 	}
 	cHash, err := getCurrentHash(ctx)
 	if err == nil && cHash == hash {
@@ -39,6 +50,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	ttl := ttlDays * 24 * 60 * 60
 
 	groups := make([]string, 0, len(data))
+	newPackagesGroups := make([]string, 0)
 
 	cmds := make([]valkey.Completed, 0)
 
@@ -53,6 +65,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 		for pkg, versions := range packages {
 
 			pkgList = append(pkgList, pkg)
+			newPackagesGroups = append(newPackagesGroups, fmt.Sprintf(valuePackages, pkg, group))
 
 			// package -> groups
 			packageGroupKey := fmt.Sprintf(viewPackagesGroup, hash, pkg)
@@ -75,7 +88,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 					Build(),
 			)
 
-			// package + group -> versions
+			// package + group -> versions + data
 			versionKey := fmt.Sprintf(viewVersions, hash, pkg, group)
 
 			hset := valkeyClient.B().
@@ -104,7 +117,7 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 		}
 
 		// group -> packages
-		packageKey := fmt.Sprintf(viewPackages, hash, group)
+		packageKey := fmt.Sprintf(viewGroupsPackages, hash, group)
 
 		cmds = append(
 			cmds,
@@ -146,6 +159,33 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 			Build(),
 	)
 
+	// list packages
+	packageKey := fmt.Sprintf(viewPackages, hash)
+
+	zadd := valkeyClient.B().
+		Zadd().
+		Key(packageKey).
+		ScoreMember()
+
+	for _, pkg := range newPackagesGroups {
+		zadd = zadd.ScoreMember(0, pkg)
+	}
+
+	cmds = append(
+		cmds,
+		zadd.Build(),
+	)
+
+	cmds = append(
+		cmds,
+		valkeyClient.B().
+			Expire().
+			Key(packageKey).
+			Seconds(ttl).
+			Build(),
+	)
+
+	// do all
 	results := valkeyClient.DoMulti(
 		ctx,
 		cmds...,
@@ -158,13 +198,20 @@ func AddViews(ctx context.Context, hash string, ttlDays int64, data map[string]m
 	}
 
 	// update hash after all views are written
-	return valkeyClient.Do(
+	err = valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Set().
 			Key(viewHash).
 			Value(hash).
 			Build(),
 	).Error()
+
+	if err != nil {
+		return err
+	}
+
+	packagesGroups = newPackagesGroups
+	return nil
 }
 
 // getCurrentHash get index hash
@@ -178,7 +225,7 @@ func getCurrentHash(ctx context.Context) (string, error) {
 }
 
 // ListGroups list groups
-func ListGroups(ctx context.Context) ([]string, error) {
+func ListGroups(ctx context.Context) (map[string]any, error) {
 	hash, err := getCurrentHash(ctx)
 	if err != nil {
 		return nil, err
@@ -186,16 +233,70 @@ func ListGroups(ctx context.Context) ([]string, error) {
 
 	key := fmt.Sprintf(viewGroups, hash)
 
-	return valkeyClient.Do(
+	v, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Smembers().
 			Key(key).
 			Build(),
 	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	vv["groups"] = v
+
+	return vv, nil
 }
 
-// ListyPackagesGroup package -> groups
-func ListyPackagesGroup(ctx context.Context, pkg string) ([]string, error) {
+func ListPackages(ctx context.Context, page int, size int) (map[string]any, error) {
+	hash, err := getCurrentHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := fmt.Sprintf(viewPackages, hash)
+
+	pageM := int(math.Ceil(float64(len(packagesGroups)) / float64(size)))
+	if page < 0 || page >= pageM {
+		return nil, errors.New("page out of range")
+	}
+
+	start := page * size
+	stop := start - 1 + size
+
+	pkgs, err := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().
+			Zrange().
+			Key(key).
+			Min(strconv.Itoa(start)).
+			Max(strconv.Itoa(stop)).
+			Build(),
+	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		k := strings.Split(pkg, "\x00")
+		p = append(p, map[string]string{
+			"package": k[0],
+			"group":   k[1],
+		})
+	}
+	vv["packages"] = p
+	vv["pages"] = pageM
+
+	return vv, nil
+}
+
+// GetGroupsByPkg package -> groups
+func GetGroupsByPkg(ctx context.Context, pkg string) (map[string]any, error) {
 
 	hash, err := getCurrentHash(ctx)
 	if err != nil {
@@ -204,34 +305,54 @@ func ListyPackagesGroup(ctx context.Context, pkg string) ([]string, error) {
 
 	key := fmt.Sprintf(viewPackagesGroup, hash, pkg)
 
-	return valkeyClient.Do(
+	v, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Smembers().
 			Key(key).
 			Build(),
 	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	vv["groups"] = v
+	vv["package"] = pkg
+
+	return vv, nil
 }
 
-// ListPackages group -> package
-func ListPackages(ctx context.Context, group string) ([]string, error) {
+// GetPackagesByGroup group -> package
+func GetPackagesByGroup(ctx context.Context, group string) (map[string]any, error) {
 
 	hash, err := getCurrentHash(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := fmt.Sprintf(viewPackages, hash, group)
+	key := fmt.Sprintf(viewGroupsPackages, hash, group)
 
-	return valkeyClient.Do(
+	v, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Smembers().
 			Key(key).
 			Build(),
 	).AsStrSlice()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	vv["group"] = group
+	vv["packages"] = v
+
+	return vv, nil
 }
 
-// ListVersions package/group -> version
-func ListVersions(ctx context.Context, pkg string, group string) ([]string, error) {
+// GetPackageVersionData group/package/version -> data
+func GetPackageVersionData(ctx context.Context, pkg string, group string, version string) (map[string]any, error) {
 
 	hash, err := getCurrentHash(ctx)
 	if err != nil {
@@ -240,35 +361,35 @@ func ListVersions(ctx context.Context, pkg string, group string) ([]string, erro
 
 	key := fmt.Sprintf(viewVersions, hash, pkg, group)
 
-	return valkeyClient.Do(
-		ctx,
-		valkeyClient.B().Hkeys().
-			Key(key).
-			Build(),
-	).AsStrSlice()
-}
-
-// GetVersionData group/package/version -> data
-func GetVersionData(ctx context.Context, pkg string, group string, version string) (string, error) {
-
-	hash, err := getCurrentHash(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	key := fmt.Sprintf(viewVersions, hash, pkg, group)
-
-	return valkeyClient.Do(
+	v, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().Hget().
 			Key(key).
 			Field(version).
 			Build(),
 	).ToString()
+
+	if err != nil {
+		return nil, err
+	}
+
+	vd := VersionData{Distfiles: nil}
+	err = json.Unmarshal([]byte(v), &vd)
+
+	if err != nil {
+		return nil, err
+	}
+
+	vv := make(map[string]any)
+	vv["versions"] = vd.Distfiles
+	vv["group"] = group
+	vv["package"] = pkg
+
+	return vv, nil
 }
 
-// GetAllVersions package/group -> version/data
-func GetAllVersions(ctx context.Context, pkg string, group string) (map[string]string, error) {
+// GetPackageVersions package/group -> version/data
+func GetPackageVersions(ctx context.Context, pkg string, group string) (map[string]any, error) {
 
 	hash, err := getCurrentHash(ctx)
 	if err != nil {
@@ -288,5 +409,10 @@ func GetAllVersions(ctx context.Context, pkg string, group string) (map[string]s
 		return nil, err
 	}
 
-	return values, nil
+	vv := make(map[string]any)
+	vv["versions"] = values
+	vv["group"] = group
+	vv["package"] = pkg
+
+	return vv, nil
 }
