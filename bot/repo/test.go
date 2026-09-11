@@ -18,7 +18,13 @@ func testUrl(url string) (int, error) {
 		Timeout: 30 * time.Second,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", "ruyi-index-test-bot/0.0.0")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
 	}
