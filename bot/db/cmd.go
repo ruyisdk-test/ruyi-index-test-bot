@@ -601,8 +601,27 @@ func CleanUrlFailures(ctx context.Context) error {
 			delUrl = append(delUrl, url)
 		}
 		stat := status["status"]
-		if reflect.TypeOf(stat).Kind() == reflect.Slice && len(stat.([]string)) == 0 {
-			delUrl = append(delUrl, url)
+		if reflect.TypeOf(stat).Kind() == reflect.Slice {
+			if len(stat.([]string)) == 0 {
+				// no such link
+				delUrl = append(delUrl, url)
+			} else {
+				// test success
+				failTime := &time.Time{}
+				for _, rs := range stat.([]string) {
+					ds := TestStatus{}
+					err := json.Unmarshal([]byte(rs), &ds)
+					if err != nil {
+						return err
+					}
+					if ds.Code == 200 && ds.Prev.After(*failTime) {
+						delUrl = append(delUrl, url)
+						break
+					} else if ds.Code != 200 && ds.Prev.After(*failTime) {
+						failTime = ds.Prev
+					}
+				}
+			}
 		}
 	}
 
