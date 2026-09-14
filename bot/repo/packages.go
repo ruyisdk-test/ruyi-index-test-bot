@@ -16,9 +16,11 @@ import (
 
 type Config struct {
 	RepoVersion string `toml:"ruyi-repo"`
-	RepoId      string `toml:"repo.id"`
-	RepoDoc     string `toml:"repo.doc_uri"`
-	RepoName    string `toml:"repo.name"`
+	Repo        struct {
+		Id   string `toml:"id"`
+		Doc  string `toml:"doc_uri"`
+		Name string `toml:"name"`
+	} `toml:"repo"`
 
 	Telemetry []Telemetry `toml:"telemetry"`
 
@@ -57,8 +59,11 @@ type Versions struct {
 
 type VersionMetadata struct {
 	Description string `toml:"desc"`
-	VendorName  string `toml:"vendor.name"`
-	VendorEula  string `toml:"vendor.eula"`
+	Vendor      struct {
+		Name string `toml:"name"`
+		Eula string `toml:"eula"`
+	} `toml:"vendor"`
+	UpstreamVersion string `toml:"upstream_version"`
 }
 
 type VersionDistfile struct {
@@ -73,7 +78,9 @@ type VersionBinary struct {
 	Host      string   `toml:"host"`
 	Distfiles []string `toml:"distfiles"`
 
-	InstallSize int64 `toml:"metadata.install_size"`
+	Metadata struct {
+		InstallSize int64 `toml:"install_size"`
+	} `toml:"metadata"`
 }
 
 type VersionChecksum struct {
@@ -152,9 +159,6 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 			for k, verentry := range verentries {
 				vName := strings.TrimSuffix(verentry.Name(), filepath.Ext(verentry.Name()))
 				groups[i].Packages[j].Versions[k].Name = vName
-				dbData[entry.Name()][pkgentry.Name()][vName] = db.VersionData{
-					Distfiles: make(map[string][]string),
-				}
 
 				data, err := os.ReadFile(filepath.Join(packagesPath, entry.Name(), pkgentry.Name(), verentry.Name()))
 				if err != nil {
@@ -165,6 +169,10 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 					return nil, err
 				}
 
+				dbData[entry.Name()][pkgentry.Name()][vName] = db.VersionData{
+					Distfiles:       make(map[string][]string),
+					UpstreamVersion: groups[i].Packages[j].Versions[k].Metadata.UpstreamVersion,
+				}
 				for _, distfile := range groups[i].Packages[j].Versions[k].Distfiles {
 					rm := slices.Contains(distfile.Restrict, "mirror")
 					newUrls, err := applyConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)

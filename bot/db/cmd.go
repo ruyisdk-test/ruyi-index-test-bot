@@ -16,7 +16,8 @@ import (
 )
 
 type VersionData struct {
-	Distfiles map[string][]string `json:"distfiles"`
+	Distfiles       map[string][]string `json:"distfiles"`
+	UpstreamVersion string              `json:"upstream_version"`
 }
 
 type TestStatus struct {
