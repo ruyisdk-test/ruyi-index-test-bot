@@ -452,7 +452,7 @@ func GetPackageVersionData(ctx context.Context, pkg string, group string, versio
 	}
 
 	vv := make(map[string]any)
-	vv["versions"] = vd.Distfiles
+	vv["files"] = vd.Distfiles
 	vv["group"] = group
 	vv["package"] = pkg
 	vv["hash"] = hash
