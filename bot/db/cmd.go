@@ -481,8 +481,18 @@ func GetPackageVersions(ctx context.Context, pkg string, group string) (map[stri
 		return nil, err
 	}
 
+	ver := make(map[string]VersionData)
+	for k, v := range values {
+		vd := VersionData{}
+		err = json.Unmarshal([]byte(v), &vd)
+		if err != nil {
+			return nil, err
+		}
+		ver[k] = vd
+	}
+
 	vv := make(map[string]any)
-	vv["versions"] = values
+	vv["versions"] = ver
 	vv["group"] = group
 	vv["package"] = pkg
 	vv["hash"] = hash
@@ -603,18 +613,13 @@ func CleanUrlFailures(ctx context.Context) error {
 		}
 		stat := status["status"]
 		if reflect.TypeOf(stat).Kind() == reflect.Slice {
-			if len(stat.([]string)) == 0 {
+			if len(stat.([]TestStatus)) == 0 {
 				// no such link
 				delUrl = append(delUrl, url)
 			} else {
 				// test success
 				failTime := &time.Time{}
-				for _, rs := range stat.([]string) {
-					ds := TestStatus{}
-					err := json.Unmarshal([]byte(rs), &ds)
-					if err != nil {
-						return err
-					}
+				for _, ds := range stat.([]TestStatus) {
 					if ds.Code == 200 && ds.Prev.After(*failTime) {
 						delUrl = append(delUrl, url)
 						break
@@ -658,9 +663,18 @@ func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	sstatus := make([]TestStatus, 0, len(status))
+	for _, s := range status {
+		ts := TestStatus{}
+		err := json.Unmarshal([]byte(s), &ts)
+		if err != nil {
+			return nil, err
+		}
+		sstatus = append(sstatus, ts)
+	}
 
 	vv := make(map[string]any)
-	vv["status"] = status
+	vv["status"] = sstatus
 	vv["url"] = url
 
 	return vv, nil
