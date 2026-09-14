@@ -12,17 +12,25 @@ import (
 const filename = "config.yaml"
 
 type Config struct {
-	ListenAddr        string `yaml:"server.listen_addr"`
-	ControlListenAddr string `yaml:"server.control_addr"`
+	Server struct {
+		ListenAddr        string `yaml:"listen_addr"`
+		ControlListenAddr string `yaml:"control_addr"`
+	} `yaml:"server"`
 
-	CacheDir string `yaml:"cache.cache_dir"`
+	Cache struct {
+		CacheDir string `yaml:"cache_dir"`
+	} `yaml:"cache"`
 
-	RepoRemote   string `yaml:"repo.remote"`
-	RepoBranch   string `yaml:"repo.branch"`
-	repoCacheDir string `yaml:"-"`
+	Repo struct {
+		Remote   string `yaml:"remote"`
+		Branch   string `yaml:"branch"`
+		cacheDir string `yaml:"-"`
+	} `yaml:"repo"`
 
-	ValkeyAddr    string `yaml:"valkey.addr"`
-	ValkeyDataTtl int64  `yaml:"valkey.data_ttl"`
+	Valkey struct {
+		Addr    string `yaml:"addr"`
+		DataTtl int64  `yaml:"data_ttl"`
+	} `yaml:"valkey"`
 
 	BeforeServe Cmd          `yaml:"before_serve"`
 	Cron        []CronConfig `yaml:"cron"`
@@ -69,37 +77,37 @@ func CfgLoad() (*Config, error) {
 		config.node = &node
 	}
 
-	if config.ControlListenAddr == "" {
-		config.ControlListenAddr = "127.0.0.1:9876"
+	if config.Server.ControlListenAddr == "" {
+		config.Server.ControlListenAddr = "127.0.0.1:9876"
 	}
-	if config.ListenAddr == "" {
-		config.ListenAddr = "127.0.0.1:9877"
+	if config.Server.ListenAddr == "" {
+		config.Server.ListenAddr = "127.0.0.1:9877"
 	}
-	if config.CacheDir == "" {
-		config.CacheDir = filepath.Join(pathCurrent, "cache")
+	if config.Cache.CacheDir == "" {
+		config.Cache.CacheDir = filepath.Join(pathCurrent, "cache")
 	}
-	config.repoCacheDir = path.Join(config.CacheDir, "repo", "ruyisdk")
-	if config.RepoRemote == "" {
-		config.RepoRemote = "https://github.com/ruyisdk/packages-index.git"
+	config.Repo.cacheDir = path.Join(config.Cache.CacheDir, "repo", "ruyisdk")
+	if config.Repo.Remote == "" {
+		config.Repo.Remote = "https://github.com/ruyisdk/packages-index.git"
 	}
-	if config.RepoBranch == "" {
-		config.RepoBranch = "main"
+	if config.Repo.Branch == "" {
+		config.Repo.Branch = "main"
 	}
-	if config.ValkeyAddr == "" {
-		config.ValkeyAddr = "127.0.0.1:6379"
+	if config.Valkey.Addr == "" {
+		config.Valkey.Addr = "127.0.0.1:6379"
 	}
-	if config.ValkeyDataTtl == 0 {
-		config.ValkeyDataTtl = 7 // days
+	if config.Valkey.DataTtl == 0 {
+		config.Valkey.DataTtl = 7 // days
 	}
 
-	slog.Info("service listening on address:", "addr", config.ListenAddr)
-	slog.Info("control listening on address:", "addr", config.ControlListenAddr)
-	slog.Info("use cache dir:", "path", config.CacheDir)
-	slog.Info("connect valkey address:", "addr", config.ValkeyAddr)
-	slog.Info("connect valkey data TTL:", "days", config.ValkeyDataTtl)
+	slog.Info("service listening on address:", "addr", config.Server.ListenAddr)
+	slog.Info("control listening on address:", "addr", config.Server.ControlListenAddr)
+	slog.Info("use cache dir:", "path", config.Cache.CacheDir)
+	slog.Info("connect valkey address:", "addr", config.Valkey.Addr)
+	slog.Info("connect valkey data TTL:", "days", config.Valkey.DataTtl)
 
-	if _, err := os.Stat(config.CacheDir); os.IsNotExist(err) {
-		if err := os.Mkdir(config.CacheDir, 0755); err != nil {
+	if _, err := os.Stat(config.Cache.CacheDir); os.IsNotExist(err) {
+		if err := os.Mkdir(config.Cache.CacheDir, 0755); err != nil {
 			slog.Error("error creating cache dir", "error", err)
 			return nil, err
 		}

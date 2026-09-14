@@ -15,18 +15,18 @@ func Serve(cfg *Config) {
 	controlRouter := gin.Default()
 
 	controlServer := http.Server{
-		Addr:    cfg.ControlListenAddr,
+		Addr:    cfg.Server.ControlListenAddr,
 		Handler: controlRouter,
 	}
 
 	router := newRouter()
 
 	server := http.Server{
-		Addr:    cfg.ListenAddr,
+		Addr:    cfg.Server.ListenAddr,
 		Handler: router,
 	}
 
-	err := db.Connect(cfg.ValkeyAddr)
+	err := db.Connect(cfg.Valkey.Addr)
 	if err != nil {
 		slog.Error("Valkey connect err:", "error", err.Error())
 		return
