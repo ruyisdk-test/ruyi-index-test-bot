@@ -13,3 +13,8 @@ See links below:
 + https://s3.ruyisdk.cn/test/packages/test/status?url=https://mirror.iscas.ac.cn/ruyisdk/dist/RuyiSDK-20260201-Upstream-Sources-HOST-aarch64-linux-gnu-riscv64-unknown-linux-gnu.tar.xz
 + https://s3.ruyisdk.cn/test/packages/test/failure
 
+## control endpoint
+
++ /config
++ /cron
++ /shutdown

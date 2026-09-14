@@ -58,6 +58,13 @@ func Serve(cfg *Config) {
 		}()
 	})
 
+	// config
+	controlRouter.GET("/config", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"config": cfg,
+		})
+	})
+
 	// cron
 	controlRouter.GET("/cron", func(c *gin.Context) {
 		c.JSON(200, gin.H{

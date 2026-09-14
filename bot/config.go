@@ -13,27 +13,27 @@ const filename = "config.yaml"
 
 type Config struct {
 	Server struct {
-		ListenAddr        string `yaml:"listen_addr"`
-		ControlListenAddr string `yaml:"control_addr"`
-	} `yaml:"server"`
+		ListenAddr        string `yaml:"listen_addr" json:"-"`
+		ControlListenAddr string `yaml:"control_addr" json:"-"`
+	} `yaml:"server" json:"-"`
 
 	Cache struct {
-		CacheDir string `yaml:"cache_dir"`
-	} `yaml:"cache"`
+		CacheDir string `yaml:"cache_dir" json:"-"`
+	} `yaml:"cache" json:"-"`
 
 	Repo struct {
-		Remote   string `yaml:"remote"`
-		Branch   string `yaml:"branch"`
-		cacheDir string `yaml:"-"`
-	} `yaml:"repo"`
+		Remote   string `yaml:"remote" json:"remote"`
+		Branch   string `yaml:"branch" json:"branch"`
+		CacheDir string `yaml:"-" json:"cache_dir"`
+	} `yaml:"repo" json:"repo"`
 
 	Valkey struct {
-		Addr    string `yaml:"addr"`
-		DataTtl int64  `yaml:"data_ttl"`
-	} `yaml:"valkey"`
+		Addr    string `yaml:"addr" json:"addr"`
+		DataTtl int64  `yaml:"data_ttl" json:"data_ttl"`
+	} `yaml:"valkey" json:"valkey"`
 
-	BeforeServe Cmd          `yaml:"before_serve"`
-	Cron        []CronConfig `yaml:"cron"`
+	BeforeServe Cmd          `yaml:"before_serve" json:"-"`
+	Cron        []CronConfig `yaml:"cron" json:"-"`
 
 	configPath string     `yaml:"-"`
 	configInit bool       `yaml:"-"`
@@ -86,7 +86,7 @@ func CfgLoad() (*Config, error) {
 	if config.Cache.CacheDir == "" {
 		config.Cache.CacheDir = filepath.Join(pathCurrent, "cache")
 	}
-	config.Repo.cacheDir = path.Join(config.Cache.CacheDir, "repo", "ruyisdk")
+	config.Repo.CacheDir = path.Join(config.Cache.CacheDir, "repo", "ruyisdk")
 	if config.Repo.Remote == "" {
 		config.Repo.Remote = "https://github.com/ruyisdk/packages-index.git"
 	}
