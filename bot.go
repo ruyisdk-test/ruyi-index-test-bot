@@ -1,12 +1,12 @@
 package main
 
-import "github.com/ruyisdk-test/ruyi-index-test-bot/bot"
+import testbot "github.com/ruyisdk-test/ruyi-index-test-bot/bot"
 
 func main() {
-	cfg, err := bot.CfgLoad()
+	cfg, err := testbot.CfgLoad()
 	if err != nil {
 		panic(err)
 	}
 
-	bot.Serve(cfg)
+	testbot.Serve(cfg)
 }
