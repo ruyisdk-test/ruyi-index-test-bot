@@ -555,11 +555,14 @@ func AddUrlTestStatus(ctx context.Context, ttlDay int64, url string, status int,
 
 	ttl := ttlDay * 24 * 60 * 60
 
+	expireAtt := time.Now().Add(time.Duration(ttl) * time.Second).Unix()
+	expireAlready := time.Now().Add(-time.Duration(ttl) * time.Second).Unix()
 	urlStatusKey := fmt.Sprintf(viewUrlTestStatus, url)
-	urlStatusAdd := valkeyClient.B().Sadd().Key(urlStatusKey).Member(string(stats)).Build()
+	urlStatusAdd := valkeyClient.B().Zadd().Key(urlStatusKey).ScoreMember().ScoreMember(float64(expireAtt), string(stats)).Build()
 	urlStatusExp := valkeyClient.B().Expire().Key(urlStatusKey).Seconds(ttl).Build()
+	urlStatusExpRem := valkeyClient.B().Zremrangebyscore().Key(urlStatusKey).Min("0").Max(strconv.FormatInt(expireAlready, 10)).Build()
 
-	cmds := []valkey.Completed{urlStatusAdd, urlStatusExp}
+	cmds := []valkey.Completed{urlStatusAdd, urlStatusExp, urlStatusExpRem}
 	urlFailureKey := viewUrlFailure
 	if stat.Code != 200 {
 		urlFailureAdd := valkeyClient.B().Sadd().Key(urlFailureKey).Member(url).Build()
@@ -612,7 +615,7 @@ func CleanUrlFailures(ctx context.Context) error {
 			delUrl = append(delUrl, url)
 		}
 		stat := status["status"]
-		if reflect.TypeOf(stat).Kind() == reflect.Slice {
+		if stat != nil && reflect.TypeOf(stat).Kind() == reflect.Slice {
 			if len(stat.([]TestStatus)) == 0 {
 				// no such link
 				delUrl = append(delUrl, url)
@@ -655,8 +658,10 @@ func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
 	status, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().
-			Smembers().
+			Zrange().
 			Key(urlKey).
+			Min("0").
+			Max(strconv.FormatInt(time.Now().Unix(), 10)).
 			Build(),
 	).AsStrSlice()
 
