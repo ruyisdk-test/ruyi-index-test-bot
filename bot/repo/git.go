@@ -2,6 +2,7 @@ package repo
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -9,23 +10,23 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
-var repoHash = ""
+var repoHash = make(map[string]string)
 
-func setRepoHash(hash string) {
+func setRepoHash(id string, hash string) {
 	if len(hash) > 7 {
-		repoHash = hash[:7]
+		repoHash[id] = hash[:7]
 	}
 }
 
-func getRepoHash() string {
-	if repoHash == "" {
-		slog.Warn("get empty local repo hash")
-		return "test-dirty"
+func getRepoHash(id string) string {
+	if repoHash[id] == "" {
+		slog.Warn("get empty local repo hash:", "id", id)
+		return fmt.Sprintf("test-dirty-%s", id)
 	}
-	return repoHash
+	return repoHash[id]
 }
 
-func repoInit(path string, remote string, branch string) error {
+func repoInit(id string, path string, remote string, branch string) error {
 	repo, err := git.PlainClone(path, &git.CloneOptions{
 		URL:           remote,
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
@@ -41,27 +42,27 @@ func repoInit(path string, remote string, branch string) error {
 	if err != nil {
 		return err
 	}
-	setRepoHash(hash.Hash().String())
+	setRepoHash(id, hash.Hash().String())
 
 	return nil
 }
 
-func CheckLatest(repoPath string, remote string, branch string) error {
+func CheckLatest(id string, repoPath string, remote string, branch string) error {
 	if _, err := os.Stat(repoPath); err != nil {
 		if os.IsNotExist(err) {
 			if err = os.MkdirAll(repoPath, 0755); err != nil {
 				return err
 			}
 
-			slog.Info("init local repo")
+			slog.Info("init local repo:", "id", id)
 
-			return repoInit(repoPath, remote, branch)
+			return repoInit(id, repoPath, remote, branch)
 		}
 
 		return err
 	}
 
-	slog.Info("update local repo")
+	slog.Info("update local repo:", "id", id)
 
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
@@ -85,7 +86,7 @@ func CheckLatest(repoPath string, remote string, branch string) error {
 	if err != nil {
 		return err
 	}
-	setRepoHash(hash.Hash().String())
+	setRepoHash(id, hash.Hash().String())
 
 	return nil
 }

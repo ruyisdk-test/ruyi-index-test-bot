@@ -44,7 +44,7 @@ func testUrl(url string) (int, error) {
 }
 
 func TestRun(repoPath string, ttlDays int64) error {
-	err := LoadData(repoPath, ttlDays)
+	err := LoadIndexData(repoPath, ttlDays)
 
 	if err != nil {
 		return err

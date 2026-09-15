@@ -81,12 +81,7 @@ func emptyRun(_ Cmd, _ *Config) error {
 }
 
 func gitRun(cmd Cmd, cfg *Config) error {
-	err := repo.CheckLatest(cfg.Repo.CacheDir, cfg.Repo.Remote, cfg.Repo.Branch)
-	if err != nil {
-		return err
-	}
-
-	return repo.LoadData(cfg.Repo.CacheDir, cfg.Valkey.DataTtl)
+	return repo.Update(&cfg.Repo, &cfg.Upstream, cfg.Valkey.DataTtl)
 }
 
 func testRun(cmd Cmd, cfg *Config) error {

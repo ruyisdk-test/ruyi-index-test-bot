@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/repo"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -21,11 +22,8 @@ type Config struct {
 		CacheDir string `yaml:"cache_dir" json:"-"`
 	} `yaml:"cache" json:"-"`
 
-	Repo struct {
-		Remote   string `yaml:"remote" json:"remote"`
-		Branch   string `yaml:"branch" json:"branch"`
-		CacheDir string `yaml:"-" json:"cache_dir"`
-	} `yaml:"repo" json:"repo"`
+	Repo     repo.Config `yaml:"repo" json:"repo"`
+	Upstream repo.Config `yaml:"upstream" json:"upstream"`
 
 	Valkey struct {
 		Addr    string `yaml:"addr" json:"addr"`
@@ -87,11 +85,18 @@ func CfgLoad() (*Config, error) {
 		config.Cache.CacheDir = filepath.Join(pathCurrent, "cache")
 	}
 	config.Repo.CacheDir = path.Join(config.Cache.CacheDir, "repo", "ruyisdk")
+	config.Upstream.CacheDir = path.Join(config.Cache.CacheDir, "upstream", "ruyisdk-test")
 	if config.Repo.Remote == "" {
 		config.Repo.Remote = "https://github.com/ruyisdk/packages-index.git"
 	}
 	if config.Repo.Branch == "" {
 		config.Repo.Branch = "main"
+	}
+	if config.Upstream.Remote == "" {
+		config.Upstream.Remote = "https://github.com/ruyisdk-test/ruyi-index-upstreams-index.git"
+	}
+	if config.Upstream.Branch == "" {
+		config.Upstream.Branch = "main"
 	}
 	if config.Valkey.Addr == "" {
 		config.Valkey.Addr = "127.0.0.1:6379"

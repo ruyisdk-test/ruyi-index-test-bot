@@ -14,7 +14,9 @@ import (
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/db"
 )
 
-type Config struct {
+const indexRepoId = "ruyisdk"
+
+type IndexConfig struct {
 	RepoVersion string `toml:"ruyi-repo"`
 	Repo        struct {
 		Id   string `toml:"id"`
@@ -88,7 +90,7 @@ type VersionChecksum struct {
 	Sha512 string `toml:"sha512"`
 }
 
-func configLoad(repoPath string) (*Config, error) {
+func indexConfigLoad(repoPath string) (*IndexConfig, error) {
 	configPath := filepath.Join(repoPath, "config.toml")
 
 	data, err := os.ReadFile(configPath)
@@ -96,7 +98,7 @@ func configLoad(repoPath string) (*Config, error) {
 		return nil, err
 	}
 
-	config := Config{}
+	config := IndexConfig{}
 	if err = toml.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
@@ -104,12 +106,12 @@ func configLoad(repoPath string) (*Config, error) {
 	return &config, nil
 }
 
-var repoConfig *Config = nil
+var repoConfig *IndexConfig = nil
 var repoPackages []PackageGroups = nil
 var dbPackagesData map[string]map[string]map[string]db.VersionData = nil
 
-func packagesLoad(repoPath string) ([]PackageGroups, error) {
-	config, err := configLoad(repoPath)
+func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
+	config, err := indexConfigLoad(repoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +177,7 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 				}
 				for _, distfile := range groups[i].Packages[j].Versions[k].Distfiles {
 					rm := slices.Contains(distfile.Restrict, "mirror")
-					newUrls, err := applyConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
+					newUrls, err := applyIndexConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
 					if err != nil {
 						return nil, err
 					}
@@ -192,7 +194,7 @@ func packagesLoad(repoPath string) ([]PackageGroups, error) {
 	return groups, nil
 }
 
-func applyConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
+func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
 	if repoConfig == nil {
 		return nil, errors.New("load repo config first")
 	}
@@ -243,9 +245,9 @@ func applyConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors
 	return newUrls, nil
 }
 
-func LoadData(repoPath string, dbTtlDays int64) error {
+func LoadIndexData(repoPath string, dbTtlDays int64) error {
 	if repoConfig == nil || repoPackages != nil || dbPackagesData == nil {
-		packages, err := packagesLoad(repoPath)
+		packages, err := packagesIndexLoad(repoPath)
 		if err != nil {
 			return err
 		}
@@ -255,5 +257,5 @@ func LoadData(repoPath string, dbTtlDays int64) error {
 	// apply to database
 	// refresh database before data expire
 	ctx := context.Background()
-	return db.AddViews(ctx, getRepoHash(), dbTtlDays, dbPackagesData)
+	return db.AddViews(ctx, getRepoHash(indexRepoId), dbTtlDays, dbPackagesData)
 }
