@@ -1,7 +1,12 @@
 package testbot
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,6 +22,12 @@ type Config struct {
 		ListenAddr        string `yaml:"listen_addr" json:"-"`
 		ControlListenAddr string `yaml:"control_addr" json:"-"`
 	} `yaml:"server" json:"-"`
+
+	ResolveBot struct {
+		Url       string `yaml:"control_url" json:"-"`
+		Available bool   `yaml:"-" json:"-"`
+		Version   string `yaml:"-" json:"version"`
+	} `yaml:"resolve_bot" json:"-"`
 
 	Cache struct {
 		CacheDir string `yaml:"cache_dir" json:"-"`
@@ -81,6 +92,9 @@ func CfgLoad() (*Config, error) {
 	if config.Server.ListenAddr == "" {
 		config.Server.ListenAddr = "127.0.0.1:9877"
 	}
+	if config.ResolveBot.Url == "" {
+		config.ResolveBot.Url = "http://127.0.0.1:9874"
+	}
 	if config.Cache.CacheDir == "" {
 		config.Cache.CacheDir = filepath.Join(pathCurrent, "cache")
 	}
@@ -107,6 +121,15 @@ func CfgLoad() (*Config, error) {
 
 	slog.Info("service listening on address:", "addr", config.Server.ListenAddr)
 	slog.Info("control listening on address:", "addr", config.Server.ControlListenAddr)
+	if err = pingResolveBot(&config); err != nil {
+		slog.Warn("pinging resolve bot failed:", "url", config.ResolveBot.Url)
+		slog.Info("run without resolve bot")
+		config.ResolveBot.Available = false
+	} else {
+		slog.Info("use resolve bot:", "url", config.ResolveBot.Url)
+		slog.Info("resolve bot version:", "version", config.ResolveBot.Version)
+		config.ResolveBot.Available = true
+	}
 	slog.Info("use cache dir:", "path", config.Cache.CacheDir)
 	slog.Info("connect valkey address:", "addr", config.Valkey.Addr)
 	slog.Info("connect valkey data TTL:", "days", config.Valkey.DataTtl)
@@ -138,4 +161,32 @@ func CfgSave(config *Config) error {
 	}
 
 	return os.WriteFile(config.configPath, data, 0644)
+}
+
+func pingResolveBot(config *Config) error {
+	u, err := url.JoinPath(config.ResolveBot.Url, "/version")
+	if err != nil {
+		return err
+	}
+	resp, err := http.Get(u)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("bad statuc code from resolveBot: " + resp.Status)
+	}
+
+	buf := make([]byte, resp.ContentLength)
+	_, err = resp.Body.Read(buf)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && err != io.EOF {
+		return err
+	}
+
+	err = json.Unmarshal(buf, &(config.ResolveBot))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
