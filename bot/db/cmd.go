@@ -556,7 +556,7 @@ func AddUrlTestStatus(ctx context.Context, ttlDay int64, url string, status int,
 	ttl := ttlDay * 24 * 60 * 60
 
 	expireAtt := time.Now().Add(time.Duration(ttl) * time.Second).Unix()
-	expireAlready := time.Now().Add(-time.Duration(ttl) * time.Second).Unix()
+	expireAlready := time.Now().Unix()
 	urlStatusKey := fmt.Sprintf(viewUrlTestStatus, url)
 	urlStatusAdd := valkeyClient.B().Zadd().Key(urlStatusKey).ScoreMember().ScoreMember(float64(expireAtt), string(stats)).Build()
 	urlStatusExp := valkeyClient.B().Expire().Key(urlStatusKey).Seconds(ttl).Build()
@@ -658,7 +658,7 @@ func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
 	status, err := valkeyClient.Do(
 		ctx,
 		valkeyClient.B().
-			Zrange().
+			Zrange(). /* should be Zrangebyscore, but it works */
 			Key(urlKey).
 			Min("0").
 			Max(strconv.FormatInt(time.Now().Unix(), 10)).

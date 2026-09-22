@@ -51,10 +51,6 @@ func TestRun(repoPath string, ttlDays int64) error {
 	}
 
 	ctx := context.Background()
-	err = db.CleanUrlFailures(ctx)
-	if err != nil {
-		return err
-	}
 
 	testList := db.GetUrlTestList()
 	for _, url := range testList {
@@ -64,6 +60,11 @@ func TestRun(repoPath string, ttlDays int64) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	err = db.CleanUrlFailures(ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil
