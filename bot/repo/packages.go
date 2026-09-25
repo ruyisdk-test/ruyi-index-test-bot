@@ -203,6 +203,7 @@ func ApplyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mi
 
 	var newUrls []string
 	if !restrictMirror {
+		// apply https://mirror.iscas.ac.cn/ruyisdk/dist/
 		for _, mirror := range mirrors["ruyi-dist"] {
 			u, err := url.JoinPath(mirror, name)
 			if err != nil {

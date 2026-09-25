@@ -34,6 +34,7 @@ func testUrl(url string) (int, error) {
 		return resp.StatusCode, fmt.Errorf("http status: %s", resp.Status)
 	}
 	buf := make([]byte, 32*1024)
+	// TODO: test file header
 
 	_, err = io.ReadFull(resp.Body, buf)
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && err != io.EOF {
