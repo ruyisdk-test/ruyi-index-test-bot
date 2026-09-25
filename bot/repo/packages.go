@@ -108,6 +108,7 @@ func IndexConfigLoad(repoPath string) (*IndexConfig, error) {
 }
 
 var repoConfig *IndexConfig = nil
+var repoMirrors map[string][]string = nil
 var repoPackages []PackageGroups = nil
 var dbPackagesData map[string]map[string]map[string]db.VersionData = nil
 
@@ -118,10 +119,11 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 	}
 	repoConfig = config
 
-	repoMirrors := make(map[string][]string)
+	mirrors := make(map[string][]string)
 	for _, mirror := range repoConfig.Mirrors {
-		repoMirrors[mirror.Id] = mirror.Urls
+		mirrors[mirror.Id] = mirror.Urls
 	}
+	repoMirrors = mirrors
 
 	dbData := make(map[string]map[string]map[string]db.VersionData)
 
@@ -178,7 +180,7 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 				}
 				for _, distfile := range groups[i].Packages[j].Versions[k].Distfiles {
 					rm := slices.Contains(distfile.Restrict, "mirror")
-					newUrls, err := ApplyIndexConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
+					newUrls, err := applyIndexConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
 					if err != nil {
 						return nil, err
 					}
@@ -195,8 +197,8 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 	return groups, nil
 }
 
-// ApplyIndexConfigUrl (distfile name, urls with mirror scheme, restrict mirror policy, mirror config map from Mirror)
-func ApplyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
+// applyIndexConfigUrl (distfile name, urls with mirror scheme, restrict mirror policy, mirror config map from Mirror)
+func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
 	//	if repoConfig == nil {
 	//		return nil, errors.New("load repo config first")
 	//	}
@@ -246,6 +248,10 @@ func ApplyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mi
 	}
 
 	return newUrls, nil
+}
+
+func MirrorApply(urls []string) ([]string, error) {
+	return applyIndexConfigUrl("", urls, true, repoMirrors)
 }
 
 func LoadIndexData(repoPath string, dbTtlDays int64) error {

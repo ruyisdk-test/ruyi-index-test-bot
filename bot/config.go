@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/repo"
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/web"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -28,6 +29,17 @@ type Config struct {
 		Available bool   `yaml:"-" json:"-"`
 		Version   string `yaml:"-" json:"version"`
 	} `yaml:"resolve_bot" json:"-"`
+
+	Model struct {
+		Provider  string `yaml:"provider"`
+		BaseUrl   string `yaml:"base_url"`
+		ApiKey    string `yaml:"api_key" json:"-"`
+		ModelName string `yaml:"model"`
+	} `yaml:"model" json:"-"`
+
+	Github struct {
+		Pat string `yaml:"token" json:"-"`
+	} `yaml:"github" json:"-"`
 
 	Cache struct {
 		CacheDir string `yaml:"cache_dir" json:"-"`
@@ -61,7 +73,7 @@ func CfgLoad() (*Config, error) {
 
 	if _, err := os.Stat(pathConfig); os.IsNotExist(err) {
 		config.configInit = true
-		slog.Warn("config file not found, using defaults")
+		slog.Warn("config file not found")
 	} else {
 
 		slog.Info("loading config file:", "path", config.configPath)
@@ -118,6 +130,49 @@ func CfgLoad() (*Config, error) {
 	if config.Valkey.DataTtl == 0 {
 		config.Valkey.DataTtl = 7 // days
 	}
+	if config.Github.Pat == "" && !config.configInit {
+		return nil, errors.New("github pat not configured")
+	}
+	if config.Model.ApiKey == "" && !config.configInit {
+		return nil, errors.New("model apikey not configured")
+	}
+	if config.Model.ModelName == "" {
+		config.Model.ModelName = "gpt-4o"
+	}
+	if config.Model.Provider == "" {
+		config.Model.Provider = "unknown"
+	}
+	if config.Model.BaseUrl == "" {
+		config.Model.BaseUrl = "https://llalla.iscas.ac.cn/v9/"
+	}
+
+	if _, err := os.Stat(config.Cache.CacheDir); os.IsNotExist(err) {
+		if err := os.Mkdir(config.Cache.CacheDir, 0755); err != nil {
+			slog.Error("error creating cache dir", "error", err)
+			return nil, err
+		}
+	}
+
+	// save config here for we have CfgSave TODOs
+	// when we solve that TODO, we can save all config on bot exit
+	if config.configInit {
+		if err = CfgSave(&config); err != nil {
+			slog.Warn("error saving init config", "error", err)
+		}
+
+		return nil, errors.New("edit init config file before next run")
+	}
+
+	slog.Info("test github pat valid")
+	err = pingGithubApi(&config)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("test model settings valid")
+	err = pingModelHello(&config)
+	if err != nil {
+		return nil, err
+	}
 
 	slog.Info("service listening on address:", "addr", config.Server.ListenAddr)
 	slog.Info("control listening on address:", "addr", config.Server.ControlListenAddr)
@@ -134,21 +189,6 @@ func CfgLoad() (*Config, error) {
 	slog.Info("connect valkey address:", "addr", config.Valkey.Addr)
 	slog.Info("connect valkey data TTL:", "days", config.Valkey.DataTtl)
 
-	if _, err := os.Stat(config.Cache.CacheDir); os.IsNotExist(err) {
-		if err := os.Mkdir(config.Cache.CacheDir, 0755); err != nil {
-			slog.Error("error creating cache dir", "error", err)
-			return nil, err
-		}
-	}
-
-	// save config here for we have CfgSave TODOs
-	// when we solve that TODO, we can save all config on bot exit
-	if config.configInit {
-		if err = CfgSave(&config); err != nil {
-			slog.Warn("error saving init config", "error", err)
-		}
-	}
-
 	return &config, nil
 }
 
@@ -161,6 +201,23 @@ func CfgSave(config *Config) error {
 	}
 
 	return os.WriteFile(config.configPath, data, 0644)
+}
+
+func pingGithubApi(config *Config) error {
+	if config.Github.Pat == "" {
+		return errors.New("no github pat configured")
+	}
+
+	err := web.InitGithubClient(config.Github.Pat)
+	if err != nil {
+		return err
+	}
+
+	return web.ListFoxOrgs()
+}
+
+func pingModelHello(config *Config) error {
+	return ModelHello(config)
 }
 
 func pingResolveBot(config *Config) error {

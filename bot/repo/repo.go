@@ -16,5 +16,9 @@ func Update(cfgIndex *Config, cfgUpstream *Config, dataTtl int64) error {
 		return err
 	}
 
-	return LoadIndexData(cfgIndex.CacheDir, dataTtl)
+	err = LoadIndexData(cfgIndex.CacheDir, dataTtl)
+	if err != nil {
+		return err
+	}
+	return UpstreamLoad(cfgUpstream.CacheDir)
 }
