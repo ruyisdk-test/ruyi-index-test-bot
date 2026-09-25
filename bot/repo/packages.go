@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	url2 "net/url"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -90,7 +90,8 @@ type VersionChecksum struct {
 	Sha512 string `toml:"sha512"`
 }
 
-func indexConfigLoad(repoPath string) (*IndexConfig, error) {
+// IndexConfigLoad load index config from repoPath/config.toml
+func IndexConfigLoad(repoPath string) (*IndexConfig, error) {
 	configPath := filepath.Join(repoPath, "config.toml")
 
 	data, err := os.ReadFile(configPath)
@@ -111,7 +112,7 @@ var repoPackages []PackageGroups = nil
 var dbPackagesData map[string]map[string]map[string]db.VersionData = nil
 
 func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
-	config, err := indexConfigLoad(repoPath)
+	config, err := IndexConfigLoad(repoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +178,7 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 				}
 				for _, distfile := range groups[i].Packages[j].Versions[k].Distfiles {
 					rm := slices.Contains(distfile.Restrict, "mirror")
-					newUrls, err := applyIndexConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
+					newUrls, err := ApplyIndexConfigUrl(distfile.Name, distfile.Urls, rm, repoMirrors)
 					if err != nil {
 						return nil, err
 					}
@@ -194,7 +195,8 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 	return groups, nil
 }
 
-func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
+// ApplyIndexConfigUrl (distfile name, urls with mirror scheme, restrict mirror policy, mirror config map from Mirror)
+func ApplyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
 	if repoConfig == nil {
 		return nil, errors.New("load repo config first")
 	}
@@ -202,18 +204,18 @@ func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mi
 	var newUrls []string
 	if !restrictMirror {
 		for _, mirror := range mirrors["ruyi-dist"] {
-			url, err := url2.JoinPath(mirror, name)
+			u, err := url.JoinPath(mirror, name)
 			if err != nil {
 				return nil, err
 			}
 
-			slog.Debug("apply ruyi-dist url:", "url", url)
-			newUrls = append(newUrls, url)
+			slog.Debug("apply ruyi-dist url:", "url", u)
+			newUrls = append(newUrls, u)
 		}
 	}
 
-	for _, url := range origUrls {
-		purl, err := url2.Parse(url)
+	for _, u := range origUrls {
+		purl, err := url.Parse(u)
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +231,7 @@ func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mi
 			}
 
 			for _, rh := range rhost {
-				ru, err := url2.JoinPath(rh, path)
+				ru, err := url.JoinPath(rh, path)
 				if err != nil {
 					return nil, err
 				}
@@ -237,8 +239,8 @@ func applyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mi
 				newUrls = append(newUrls, ru)
 			}
 		} else {
-			slog.Debug("apply origin url:", "url", url)
-			newUrls = append(newUrls, url)
+			slog.Debug("apply origin url:", "url", u)
+			newUrls = append(newUrls, u)
 		}
 	}
 
