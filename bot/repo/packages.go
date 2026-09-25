@@ -197,9 +197,9 @@ func packagesIndexLoad(repoPath string) ([]PackageGroups, error) {
 
 // ApplyIndexConfigUrl (distfile name, urls with mirror scheme, restrict mirror policy, mirror config map from Mirror)
 func ApplyIndexConfigUrl(name string, origUrls []string, restrictMirror bool, mirrors map[string][]string) ([]string, error) {
-	if repoConfig == nil {
-		return nil, errors.New("load repo config first")
-	}
+	//	if repoConfig == nil {
+	//		return nil, errors.New("load repo config first")
+	//	}
 
 	var newUrls []string
 	if !restrictMirror {
