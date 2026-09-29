@@ -251,7 +251,7 @@ func testUrlStatus(c *gin.Context) {
 func upstreamByPkg(c *gin.Context) {
 	r, err := repo.GetUpstreamByPackage(c.Param("pkg"), c.Param("type"))
 	if err != nil {
-		c.JSON(200, nil)
+		c.JSON(404, gin.H{"error": "upstream not found"})
 		return
 	}
 
@@ -266,7 +266,7 @@ func upstreamNewVersions(c *gin.Context) {
 func upstreamNewVersionsByPkg(c *gin.Context) {
 	u, err := repo.GetUpstreamByPackage(c.Param("pkg"), c.Param("type"))
 	if err != nil {
-		c.JSON(200, nil)
+		c.JSON(404, gin.H{"error": "upstream not found"})
 		return
 	}
 
