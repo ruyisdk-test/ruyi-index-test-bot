@@ -85,5 +85,9 @@ func gitRun(cmd Cmd, cfg *Config) error {
 }
 
 func testRun(cmd Cmd, cfg *Config) error {
-	return repo.TestRun(cfg.Repo.CacheDir, cfg.Valkey.DataTtl)
+	err := repo.DistfileUrlTestRun(cfg.Repo.CacheDir, cfg.Valkey.DataTtl)
+	if err != nil {
+		return err
+	}
+	return repo.UpstreamVersionTestRun()
 }

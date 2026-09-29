@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -80,17 +81,37 @@ func UpstreamLoad(repoPath string) error {
 			continue
 		}
 
+		if !slices.Contains([]string{"web", "github"}, riko2.Upstream.Source) {
+			slog.Warn("unsupported riko2 source:", "source", riko2.Upstream.Source)
+			slog.Info("will skip:", "upstream", up.Name())
+			continue
+		} else if riko2.Upstream.Source == "github" {
+			if riko2.Upstream.Github == "" {
+				slog.Warn("riko2 source github with empty repo")
+				slog.Info("will skip:", "upstream", up.Name())
+				continue
+			}
+		} else if riko2.Upstream.Source == "web" {
+			if riko2.Mirror.Url == nil || len(riko2.Mirror.Url) == 0 {
+				slog.Warn("riko2 source web with empty mirror list")
+				slog.Info("will skip:", "upstream", up.Name())
+				continue
+			}
+		}
+
 		sup := Upstream{
 			Riko2:  riko2,
 			Readme: string(readmeRaw),
 		}
-		nu, err := MirrorApply(sup.Riko2.Mirror.Url)
+		_, err = MirrorApply(sup.Riko2.Mirror.Url)
 		if err != nil {
 			slog.Warn("riko2 mirror configs apply failed", "path", upRiko, "err", err)
 			slog.Info("will skip:", "upstream", up.Name())
 			continue
 		}
-		sup.Riko2.Mirror.Url = nu
+		// check only
+		// really apply on check
+		// sup.Riko2.Mirror.Url = nu
 
 		sups[up.Name()] = sup
 

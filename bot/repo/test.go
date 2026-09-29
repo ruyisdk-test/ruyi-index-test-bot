@@ -8,7 +8,7 @@ import (
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/web"
 )
 
-func TestRun(repoPath string, ttlDays int64) error {
+func DistfileUrlTestRun(repoPath string, ttlDays int64) error {
 	err := LoadIndexData(repoPath, ttlDays)
 
 	if err != nil {
@@ -32,5 +32,9 @@ func TestRun(repoPath string, ttlDays int64) error {
 		return err
 	}
 
+	return nil
+}
+
+func UpstreamVersionTestRun() error {
 	return nil
 }
