@@ -16,8 +16,9 @@ const upstreamRepoId = "upstream"
 
 type Riko2 struct {
 	Upstream struct {
-		Source string `yaml:"source" json:"source"`
-		Github string `yaml:"github" json:"github"`
+		Source     string `yaml:"source" json:"source"`
+		Github     string `yaml:"github" json:"github"`
+		WithMirror bool   `yaml:"with_mirror" json:"with_mirror"`
 	} `yaml:"upstream" json:"upstream"`
 
 	Mirror struct {
@@ -93,8 +94,12 @@ func UpstreamLoad(repoPath string) error {
 				continue
 			}
 		} else if riko2.Upstream.Source == "web" {
+			riko2.Upstream.WithMirror = true
+		}
+
+		if riko2.Upstream.WithMirror == true {
 			if riko2.Mirror.Url == nil || len(riko2.Mirror.Url) == 0 {
-				slog.Warn("riko2 source web with empty mirror list")
+				slog.Warn("riko2 source with mirror but met empty mirror list")
 				slog.Info("will skip:", "upstream", up.Name())
 				continue
 			}

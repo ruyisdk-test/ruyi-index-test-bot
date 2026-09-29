@@ -46,7 +46,7 @@ func UpstreamVersionTestRun() error {
 
 		slog.Info("version check prompt for ...:", "name", n)
 
-		if c.Riko2.Upstream.Source == "web" {
+		if c.Riko2.Upstream.WithMirror {
 			for _, u := range c.Riko2.Mirror.Url {
 				nu, err := MirrorApply([]string{u})
 				if err != nil {
@@ -65,6 +65,10 @@ func UpstreamVersionTestRun() error {
 				}
 				prompt = append(prompt, "```", string(r), "```")
 			}
+		}
+
+		if c.Riko2.Upstream.Source == "web" {
+			// do nothing special
 		} else if c.Riko2.Upstream.Source == "github" {
 			prompt = append(prompt, web.ReleasesGetRawPrompt(c.Riko2.Upstream.Github))
 			r, err := web.ReleasesGetRaw(c.Riko2.Upstream.Github)
