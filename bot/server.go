@@ -123,7 +123,7 @@ func newDbRouter(router *gin.Engine) {
 
 	// upstream endpoint
 	router.GET("/packages/upstream/:type/:pkg", upstreamByPkg)
-	router.GET("/packages/test/nvcheck/package/:upstream", upstreamNewVersions)
+	router.GET("/packages/test/nvcheck/upstream/:upstream", upstreamNewVersions)
 	router.GET("/packages/test/nvcheck/package/:type/:pkg", upstreamNewVersionsByPkg)
 }
 
