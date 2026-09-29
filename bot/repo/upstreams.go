@@ -99,6 +99,12 @@ func UpstreamLoad(repoPath string) error {
 			}
 		}
 
+		if riko2.Packages == nil || len(riko2.Packages) == 0 {
+			slog.Warn("riko2 upstream with empty package list")
+			slog.Info("will skip:", "upstream", up.Name())
+			continue
+		}
+
 		sup := Upstream{
 			Riko2:  riko2,
 			Readme: string(readmeRaw),
