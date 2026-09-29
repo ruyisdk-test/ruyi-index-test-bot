@@ -16,16 +16,16 @@ const upstreamRepoId = "upstream"
 
 type Riko2 struct {
 	Upstream struct {
-		Source     string `yaml:"source" json:"source"`
-		Github     string `yaml:"github" json:"github"`
-		WithMirror bool   `yaml:"with_mirror" json:"with_mirror"`
-	} `yaml:"upstream" json:"upstream"`
+		Source     string `toml:"source" json:"source"`
+		Github     string `toml:"github" json:"github"`
+		WithMirror bool   `toml:"with_mirror" json:"with_mirror"`
+	} `toml:"upstream" json:"upstream"`
 
 	Mirror struct {
-		Url []string `yaml:"url" json:"url"`
-	} `yaml:"mirror" json:"mirror"`
+		Url []string `toml:"url" json:"url"`
+	} `toml:"mirror" json:"mirror"`
 
-	Packages map[string][]string `yaml:"packages" json:"packages"`
+	Packages map[string][]string `toml:"packages" json:"packages"`
 }
 
 type Upstream struct {
