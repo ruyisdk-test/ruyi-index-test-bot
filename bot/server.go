@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/db"
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/repo"
 )
 
 func Serve(cfg *Config) {
@@ -119,6 +120,9 @@ func newDbRouter(router *gin.Engine) {
 	router.GET("/packages/url", pkgSearchPkgsByUrl)
 	router.GET("/packages/test/failure", testUrlFailure)
 	router.GET("/packages/test/status", testUrlStatus)
+
+	// upstream endpoint
+	router.GET("/packages/upstream/:type/:pkg", upstreamByPkg)
 }
 
 func return500(c *gin.Context, err error) {
@@ -236,6 +240,16 @@ func testUrlStatus(c *gin.Context) {
 	r, err := db.GetUrlTestStatus(c.Request.Context(), c.Query("url"))
 	if err != nil {
 		return500(c, err)
+		return
+	}
+
+	c.JSON(200, r)
+}
+
+func upstreamByPkg(c *gin.Context) {
+	r, err := repo.GetUpstreamByPackage(c.Param("pkg"), c.Param("type"))
+	if err != nil {
+		c.JSON(200, nil)
 		return
 	}
 

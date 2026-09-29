@@ -36,5 +36,6 @@ func DistfileUrlTestRun(repoPath string, ttlDays int64) error {
 }
 
 func UpstreamVersionTestRun() error {
+
 	return nil
 }

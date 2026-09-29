@@ -16,20 +16,21 @@ const upstreamRepoId = "upstream"
 
 type Riko2 struct {
 	Upstream struct {
-		Source string `yaml:"source"`
-		Github string `yaml:"github"`
-	} `yaml:"upstream"`
+		Source string `yaml:"source" json:"source"`
+		Github string `yaml:"github" json:"github"`
+	} `yaml:"upstream" json:"upstream"`
 
 	Mirror struct {
-		Url []string `yaml:"url"`
-	} `yaml:"mirror"`
+		Url []string `yaml:"url" json:"url"`
+	} `yaml:"mirror" json:"mirror"`
 
-	Packages map[string][]string `yaml:"packages"`
+	Packages map[string][]string `yaml:"packages" json:"packages"`
 }
 
 type Upstream struct {
-	Riko2  Riko2
-	Readme string
+	Name   string `json:"name"`
+	Riko2  Riko2  `json:"riko2"`
+	Readme string `json:"-"`
 }
 
 var upstreamsConfig map[string]Upstream = nil
@@ -106,6 +107,7 @@ func UpstreamLoad(repoPath string) error {
 		}
 
 		sup := Upstream{
+			Name:   up.Name(),
 			Riko2:  riko2,
 			Readme: string(readmeRaw),
 		}
