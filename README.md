@@ -12,6 +12,9 @@ See links below:
 + https://s3.ruyisdk.cn/test/packages/url?url=https://mirror.iscas.ac.cn/ruyisdk/dist/RuyiSDK-20260201-Upstream-Sources-HOST-aarch64-linux-gnu-riscv64-unknown-linux-gnu.tar.xz
 + https://s3.ruyisdk.cn/test/packages/test/status?url=https://mirror.iscas.ac.cn/ruyisdk/dist/RuyiSDK-20260201-Upstream-Sources-HOST-aarch64-linux-gnu-riscv64-unknown-linux-gnu.tar.xz
 + https://s3.ruyisdk.cn/test/packages/test/failure
++ https://s3.ruyisdk.cn/test/packages/upstream/board-image/revyos-milkv-meles
++ https://s3.ruyisdk.cn/test/packages/test/nvcheck/package/board-image/revyos-milkv-meles
++ https://s3.ruyisdk.cn/test/packages/test/nvcheck/upstream/revyos-meles
 
 ## control endpoint
 
