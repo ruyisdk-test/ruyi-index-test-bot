@@ -18,6 +18,7 @@ func PageGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("User-Agent", "ruyi-index-test-bot/0.0.0")
 
 	resp, err := client.Do(req)
@@ -29,10 +30,9 @@ func PageGet(url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("http status: %s", resp.Status)
 	}
-	buf := make([]byte, resp.ContentLength)
 
-	_, err = io.ReadFull(resp.Body, buf)
-	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && err != io.EOF {
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, fmt.Errorf("download failed: %w", err)
 	}
 
