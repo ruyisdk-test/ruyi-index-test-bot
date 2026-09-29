@@ -123,6 +123,8 @@ func newDbRouter(router *gin.Engine) {
 
 	// upstream endpoint
 	router.GET("/packages/upstream/:type/:pkg", upstreamByPkg)
+	router.GET("/packages/test/nvcheck/package/:upstream", upstreamNewVersions)
+	router.GET("/packages/test/nvcheck/package/:type/:pkg", upstreamNewVersionsByPkg)
 }
 
 func return500(c *gin.Context, err error) {
@@ -253,5 +255,21 @@ func upstreamByPkg(c *gin.Context) {
 		return
 	}
 
+	c.JSON(200, r)
+}
+
+func upstreamNewVersions(c *gin.Context) {
+	r, _ := repo.GetNewVersionsByUpstream(c.Param("upstream"))
+	c.JSON(200, r)
+}
+
+func upstreamNewVersionsByPkg(c *gin.Context) {
+	u, err := repo.GetUpstreamByPackage(c.Param("pkg"), c.Param("type"))
+	if err != nil {
+		c.JSON(200, nil)
+		return
+	}
+
+	r, _ := repo.GetNewVersionsByUpstream(u.Name)
 	c.JSON(200, r)
 }

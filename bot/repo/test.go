@@ -39,6 +39,8 @@ func DistfileUrlTestRun(repoPath string, ttlDays int64) error {
 	return nil
 }
 
+var upstreamVersionResult = make(map[string]*testagent.UpstreamVersionResult)
+
 func UpstreamVersionTestRun() error {
 	for n, c := range getUpstreamsMap() {
 		prompt := []string{c.Readme}
@@ -132,14 +134,23 @@ func UpstreamVersionTestRun() error {
 			prompts = prompts + "\n" + p
 		}
 
-		slog.Info("ask agent:", "prompt", prompts)
+		slog.Debug("ask agent:", "prompt", prompts)
 		// ask agent
 		res, _, err := testagent.ModelAskUpstreamVersion(prompts)
 		if err != nil {
 			slog.Error("failed to ask agent:", "err", err)
 		}
-		slog.Info("agent answer:", "ans", res)
+		slog.Debug("agent answer:", "ans", res)
+
+		upstreamVersionResult[n] = res
 	}
 
 	return nil
+}
+
+func GetNewVersionsByUpstream(upstream string) (testagent.UpstreamVersionResult, error) {
+	if res, ok := upstreamVersionResult[upstream]; ok {
+		return *res, nil
+	}
+	return testagent.UpstreamVersionResult{}, nil
 }
