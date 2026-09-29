@@ -30,6 +30,10 @@ func ListFoxOrgs() error {
 	return err
 }
 
+func ReleasesGetRawPrompt(repo string) string {
+	return fmt.Sprintf("从 API 获取 GitHub 仓库 %s 最新 25 个 release 的 json 结果", repo)
+}
+
 func ReleasesGetRaw(repo string) (string, error) {
 	if ghClient == nil {
 		return "", fmt.Errorf("github client not initialized")

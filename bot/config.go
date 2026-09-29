@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/agent"
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/repo"
 	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/web"
 	"go.yaml.in/yaml/v3"
@@ -217,7 +218,7 @@ func pingGithubApi(config *Config) error {
 }
 
 func pingModelHello(config *Config) error {
-	return ModelHello(config)
+	return testagent.ModelHello(config.Model.Provider, config.Model.ModelName, config.Model.BaseUrl, config.Model.ApiKey)
 }
 
 func pingResolveBot(config *Config) error {

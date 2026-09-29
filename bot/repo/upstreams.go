@@ -142,6 +142,10 @@ func UpstreamLoad(repoPath string) error {
 	return nil
 }
 
+func getUpstreamsMap() map[string]Upstream {
+	return upstreamsConfig
+}
+
 func GetUpstream(upstreamName string) (Upstream, error) {
 	upstream, ok := upstreamsConfig[upstreamName]
 	if !ok {

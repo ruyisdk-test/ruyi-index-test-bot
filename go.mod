@@ -13,6 +13,7 @@ require (
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/valkey-io/valkey-go v1.0.77
 	go.yaml.in/yaml/v3 v3.0.5
+	golang.org/x/mod v0.38.0
 )
 
 require (
