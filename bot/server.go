@@ -136,7 +136,7 @@ func return500(c *gin.Context, err error) {
 }
 
 func pkgSearch(c *gin.Context) {
-	r, err := db.SearchPackages(c.Query("key"))
+	r, err := db.SearchPackages(c.Request.Context(), c.Query("key"))
 	if err != nil {
 		return500(c, err)
 		return

@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/ruyisdk-test/ruyi-index-test-bot/bot/db"
 )
 
 const upstreamRepoId = "upstream"
@@ -39,7 +42,7 @@ var packagesUpstream map[string]string = nil
 
 const packagesKeyFmt string = "%s\x00%s"
 
-func UpstreamLoad(repoPath string) error {
+func UpstreamLoad(repoPath string, dbTtlDays int64) error {
 	upPath := filepath.Join(repoPath, "upstream")
 	if _, err := os.Stat(upPath); err != nil {
 		slog.Error("upstream configs not found", "path", upPath)
@@ -141,6 +144,20 @@ func UpstreamLoad(repoPath string) error {
 		}
 	}
 
+	supsj := make(map[string]string)
+	for v, k := range sups {
+		j, err := json.Marshal(k)
+		if err != nil {
+			return err
+		}
+		supsj[v] = string(j)
+	}
+
+	err = db.AddUpstreamView(context.Background(), getRepoHash(upstreamRepoId), dbTtlDays, supsj, pkgu)
+	if err != nil {
+		return err
+	}
+
 	upstreamsConfig = sups
 	packagesUpstream = pkgu
 
@@ -151,7 +168,7 @@ func getUpstreamsMap() map[string]Upstream {
 	return upstreamsConfig
 }
 
-func GetUpstream(upstreamName string) (Upstream, error) {
+func getUpstream(upstreamName string) (Upstream, error) {
 	upstream, ok := upstreamsConfig[upstreamName]
 	if !ok {
 		return Upstream{}, errors.New("upstream not found")
@@ -160,10 +177,19 @@ func GetUpstream(upstreamName string) (Upstream, error) {
 }
 
 func GetUpstreamByPackage(packageName string, packageGroup string) (Upstream, error) {
-	key := fmt.Sprintf(packagesKeyFmt, packageGroup, packageName)
-	upstream, ok := packagesUpstream[key]
-	if !ok {
-		return Upstream{}, errors.New("package not found")
+	ctx := context.Background()
+	un, err := db.GetPackageUpstream(ctx, packageGroup, packageName)
+	if err != nil {
+		return Upstream{}, err
 	}
-	return GetUpstream(upstream)
+	uj, err := db.GetUpstream(ctx, un)
+	if err != nil {
+		return Upstream{}, err
+	}
+	u := Upstream{}
+	err = json.Unmarshal([]byte(uj), &u)
+	if err != nil {
+		return Upstream{}, err
+	}
+	return u, nil
 }

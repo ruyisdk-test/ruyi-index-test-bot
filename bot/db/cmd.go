@@ -39,6 +39,12 @@ const viewUrlPackages = viewPrefix + "%s\x00%s\x00packages"
 const viewUrlTestStatus = viewPrefix + "%s\x00status"
 const viewUrlFailure = viewPrefix + "urlfailed"
 
+// upstream
+const upstreamViewPrefix = viewPrefix + "upstream\x00"
+const upstreamViewHash = upstreamViewPrefix + "hash"
+const upstreamViewUpstreamConfig = upstreamViewPrefix + "%s\x00%s\x00config"
+const upstreamViewPackageUpstream = upstreamViewPrefix + "%s\x00%s\x00upstream"
+
 var packagesGroups []string = nil
 var urlTestList []string = nil
 
@@ -302,6 +308,11 @@ func ListPackages(ctx context.Context, page int, size int) (map[string]any, erro
 		return nil, err
 	}
 
+	uhash, err := getCurrentUpstreamHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	key := fmt.Sprintf(viewPackages, hash)
 
 	pageM := int(math.Ceil(float64(len(packagesGroups)) / float64(size)))
@@ -326,40 +337,63 @@ func ListPackages(ctx context.Context, page int, size int) (map[string]any, erro
 		return nil, err
 	}
 
-	vv := make(map[string]any)
-	p := make([]map[string]string, 0, len(pkgs))
+	keys := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
 		k := strings.Split(pkg, "\x00")
+		keys = append(keys, packageUpstreamKey(k[1], k[0]))
+	}
+	ups := getPackagesUpstream(ctx, uhash, keys)
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(pkgs))
+	for i, pkg := range pkgs {
+		k := strings.Split(pkg, "\x00")
 		p = append(p, map[string]string{
-			"package": k[0],
-			"group":   k[1],
+			"package":  k[0],
+			"group":    k[1],
+			"upstream": ups[keys[i]],
 		})
 	}
 	vv["packages"] = p
 	vv["pages"] = pageM
 	vv["hash"] = hash
+	vv["hash_upstream"] = uhash
 
 	return vv, nil
 }
 
 // SearchPackages fuzzy search packages
-func SearchPackages(pattern string) (map[string]any, error) {
+func SearchPackages(ctx context.Context, pattern string) (map[string]any, error) {
+	uhash, err := getCurrentUpstreamHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	matches := fuzzy.Find(pattern, packagesGroups)
 	if len(matches) > 50 {
 		matches = matches[:50]
 	}
 
-	vv := make(map[string]any)
-	p := make([]map[string]string, 0, len(matches))
+	keys := make([]string, 0, len(matches))
 	for _, match := range matches {
 		k := strings.Split(match.Str, "\x00")
+		keys = append(keys, packageUpstreamKey(k[1], k[0]))
+	}
+	ups := getPackagesUpstream(ctx, uhash, keys)
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(matches))
+	for i, match := range matches {
+		k := strings.Split(match.Str, "\x00")
 		p = append(p, map[string]string{
-			"package": k[0],
-			"group":   k[1],
-			"score":   strconv.Itoa(match.Score),
+			"package":  k[0],
+			"group":    k[1],
+			"upstream": ups[keys[i]],
+			"score":    strconv.Itoa(match.Score),
 		})
 	}
 	vv["packages"] = p
+	vv["hash_upstream"] = uhash
 
 	return vv, nil
 }
@@ -468,6 +502,11 @@ func GetPackageVersions(ctx context.Context, pkg string, group string) (map[stri
 		return nil, err
 	}
 
+	uhash, err := getCurrentUpstreamHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	key := fmt.Sprintf(viewVersions, hash, pkg, group)
 
 	values, err := valkeyClient.Do(
@@ -495,13 +534,20 @@ func GetPackageVersions(ctx context.Context, pkg string, group string) (map[stri
 	vv["versions"] = ver
 	vv["group"] = group
 	vv["package"] = pkg
+	vv["upstream"] = getPackageUpstream(ctx, uhash, group, pkg)
 	vv["hash"] = hash
+	vv["hash_upstream"] = uhash
 
 	return vv, nil
 }
 
 func GetPackagesByUrl(ctx context.Context, url string) (map[string]any, error) {
 	hash, err := getCurrentHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	uhash, err := getCurrentUpstreamHash(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -520,17 +566,26 @@ func GetPackagesByUrl(ctx context.Context, url string) (map[string]any, error) {
 		return nil, err
 	}
 
-	vv := make(map[string]any)
-	p := make([]map[string]string, 0, len(pkgs))
+	keys := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
 		k := strings.Split(pkg, "\x00")
+		keys = append(keys, packageUpstreamKey(k[1], k[0]))
+	}
+	ups := getPackagesUpstream(ctx, uhash, keys)
+
+	vv := make(map[string]any)
+	p := make([]map[string]string, 0, len(pkgs))
+	for i, pkg := range pkgs {
+		k := strings.Split(pkg, "\x00")
 		p = append(p, map[string]string{
-			"package": k[0],
-			"group":   k[1],
+			"package":  k[0],
+			"group":    k[1],
+			"upstream": ups[keys[i]],
 		})
 	}
 	vv["packages"] = p
 	vv["hash"] = hash
+	vv["hash_upstream"] = uhash
 
 	return vv, nil
 }
@@ -683,4 +738,155 @@ func GetUrlTestStatus(ctx context.Context, url string) (map[string]any, error) {
 	vv["url"] = url
 
 	return vv, nil
+}
+
+// AddUpstreamView package -> upstream
+func AddUpstreamView(ctx context.Context, hash string, ttlDays int64, upstreamsConfig map[string]string, packagesUpstream map[string]string) error {
+	if valkeyClient == nil {
+		return errors.New("valkey client is nil")
+	}
+	if ttlDays <= 0 {
+		return errors.New("ttl days must be greater than zero")
+	}
+
+	ttl := ttlDays * 24 * 60 * 60
+
+	cmds := make([]valkey.Completed, 0)
+	for k, v := range upstreamsConfig {
+		cmds = append(cmds, valkeyClient.B().Set().
+			Key(fmt.Sprintf(upstreamViewUpstreamConfig, hash, k)).
+			Value(v).
+			Build(),
+		)
+		cmds = append(cmds, valkeyClient.B().Expire().
+			Key(fmt.Sprintf(upstreamViewUpstreamConfig, hash, k)).
+			Seconds(ttl).
+			Build(),
+		)
+	}
+
+	for k, v := range packagesUpstream {
+		cmds = append(cmds, valkeyClient.B().Set().
+			Key(fmt.Sprintf(upstreamViewPackageUpstream, hash, k)).
+			Value(v).
+			Build(),
+		)
+		cmds = append(cmds, valkeyClient.B().Expire().
+			Key(fmt.Sprintf(upstreamViewPackageUpstream, hash, k)).
+			Seconds(ttl).
+			Build(),
+		)
+	}
+
+	// do all
+	results := valkeyClient.DoMulti(
+		ctx,
+		cmds...,
+	)
+
+	for _, result := range results {
+		if err := result.Error(); err != nil {
+			return err
+		}
+	}
+
+	// update hash after all views are written
+	err := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().Set().
+			Key(upstreamViewHash).
+			Value(hash).
+			Build(),
+	).Error()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getCurrentUpstreamHash get index hash
+func getCurrentUpstreamHash(ctx context.Context) (string, error) {
+	return valkeyClient.Do(
+		ctx,
+		valkeyClient.B().Get().
+			Key(upstreamViewHash).
+			Build(),
+	).ToString()
+}
+
+func getUpstreamConfig(ctx context.Context, hash string, key string) (string, error) {
+	return valkeyClient.Do(
+		ctx,
+		valkeyClient.B().Get().
+			Key(fmt.Sprintf(upstreamViewUpstreamConfig, hash, key)).
+			Build(),
+	).ToString()
+}
+
+// packageUpstreamKey "group\x00package" key of packagesUpstream view
+func packageUpstreamKey(group string, pkg string) string {
+	return fmt.Sprintf("%s\x00%s", group, pkg)
+}
+
+func getPackagesUpstream(ctx context.Context, hash string, keys []string) map[string]string {
+	ups := make(map[string]string, len(keys))
+	if len(keys) == 0 {
+		return ups
+	}
+
+	cmds := make([]valkey.Completed, 0, len(keys))
+	for _, key := range keys {
+		cmds = append(
+			cmds,
+			valkeyClient.B().
+				Get().
+				Key(fmt.Sprintf(upstreamViewPackageUpstream, hash, key)).
+				Build(),
+		)
+	}
+
+	for i, result := range valkeyClient.DoMulti(ctx, cmds...) {
+		if u, err := result.ToString(); err == nil {
+			ups[keys[i]] = u
+		}
+	}
+
+	return ups
+}
+
+func getPackageUpstream(ctx context.Context, hash string, group string, pkg string) string {
+	u, e := valkeyClient.Do(
+		ctx,
+		valkeyClient.B().Get().
+			Key(fmt.Sprintf(upstreamViewPackageUpstream, hash, packageUpstreamKey(group, pkg))).
+			Build(),
+	).ToString()
+	if e != nil {
+		return ""
+	}
+	return u
+}
+
+func GetPackageUpstream(ctx context.Context, group string, pkg string) (string, error) {
+	uhash, err := getCurrentUpstreamHash(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	resp := getPackageUpstream(ctx, uhash, group, pkg)
+	if resp == "" {
+		return "", errors.New("package not found")
+	}
+	return resp, nil
+}
+
+func GetUpstream(ctx context.Context, upstream string) (string, error) {
+	uhash, err := getCurrentUpstreamHash(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return getUpstreamConfig(ctx, uhash, upstream)
 }
